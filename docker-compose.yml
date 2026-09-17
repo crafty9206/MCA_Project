@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: maatricare-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: maatricare
+      POSTGRES_USER: maatricare
+      POSTGRES_PASSWORD: maatricare
+    ports:
+      - "5432:5432"
+    volumes:
+      - maatricare-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  maatricare-postgres-data:
