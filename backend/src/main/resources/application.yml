@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: maatricare-backend
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/maatricare}
+    username: ${DATABASE_USERNAME:maatricare}
+    password: ${DATABASE_PASSWORD:maatricare}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+server:
+  port: ${PORT:8080}
+
+security:
+  jwt:
+    secret: ${JWT_SECRET:maatricare-local-development-secret-key-please-change}
+    expiration-minutes: ${JWT_EXPIRATION_MINUTES:120}
