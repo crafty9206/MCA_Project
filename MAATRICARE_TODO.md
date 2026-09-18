@@ -3,7 +3,8 @@
 ## Project Goal
 
 Build a pregnancy support and care-coordination application using React, Spring Boot, and MySQL or PostgreSQL. The application provides organization, reminders, educational information, symptom journaling, and healthcare communication support. It must not diagnose conditions or replace professional medical advice.
-
+ 
+ ok
 ## Phase 1: Frontend Foundation
 
 - [x] Create React TypeScript frontend with Vite
