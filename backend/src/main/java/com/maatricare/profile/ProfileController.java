@@ -1,6 +1,7 @@
 package com.maatricare.profile;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.math.BigDecimal;
 
@@ -13,6 +14,7 @@ import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -42,6 +44,23 @@ public class ProfileController {
         return toResponse(user, pregnancyProfileRepository.findByUserId(user.getId()).orElse(null));
     }
 
+    @PatchMapping
+    public ProfileResponse updateProfile(Authentication authentication, @Valid @RequestBody ProfileUpdateRequest request) {
+        User user = currentUser(authentication);
+        user.setDisplayName(request.displayName().trim());
+        user.updateNotificationPreferences(
+            request.appointmentRemindersEnabled() == null ? user.isAppointmentRemindersEnabled() : request.appointmentRemindersEnabled(),
+            request.browserNotificationsEnabled() == null ? user.isBrowserNotificationsEnabled() : request.browserNotificationsEnabled(),
+            request.dailyCareRemindersEnabled() == null ? user.isDailyCareRemindersEnabled() : request.dailyCareRemindersEnabled(),
+                request.dailyCareReminderTime() == null ? user.getDailyCareReminderTime() : request.dailyCareReminderTime(),
+                request.weeklyPregnancyRemindersEnabled() == null ? user.isWeeklyPregnancyRemindersEnabled() : request.weeklyPregnancyRemindersEnabled(),
+                request.weeklyPregnancyReminderDay() == null ? user.getWeeklyPregnancyReminderDay() : request.weeklyPregnancyReminderDay(),
+                request.weeklyPregnancyReminderTime() == null ? user.getWeeklyPregnancyReminderTime() : request.weeklyPregnancyReminderTime(),
+                request.missedTaskRemindersEnabled() == null ? user.isMissedTaskRemindersEnabled() : request.missedTaskRemindersEnabled());
+        User savedUser = userRepository.save(user);
+        return toResponse(savedUser, pregnancyProfileRepository.findByUserId(savedUser.getId()).orElse(null));
+    }
+
     @PostMapping("/pregnancy")
     @ResponseStatus(HttpStatus.CREATED)
     public ProfileResponse createPregnancyProfile(Authentication authentication,
@@ -57,6 +76,18 @@ public class ProfileController {
         return toResponse(user, profile);
     }
 
+    @PatchMapping("/pregnancy")
+    public ProfileResponse updatePregnancyProfile(Authentication authentication,
+            @Valid @RequestBody PregnancyRequest request) {
+        User user = currentUser(authentication);
+        PregnancyProfile profile = pregnancyProfileRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new IllegalStateException("A pregnancy profile does not exist"));
+        profile.updateDetails(request.lastMenstrualPeriod(), request.lastMenstrualPeriod().plusDays(280),
+                request.ageYears(), request.heightCm(), request.prePregnancyWeightKg(), request.bloodPressure(),
+                request.bloodGroup());
+        return toResponse(user, pregnancyProfileRepository.save(profile));
+    }
+
     private User currentUser(Authentication authentication) {
         return userRepository.findByEmailIgnoreCase(authentication.getName())
                 .orElseThrow(() -> new IllegalStateException("Authenticated user was not found"));
@@ -64,7 +95,11 @@ public class ProfileController {
 
     private ProfileResponse toResponse(User user, PregnancyProfile profile) {
         PregnancySummary pregnancy = profile == null ? null : pregnancySummary(profile);
-        return new ProfileResponse(user.getEmail(), user.getDisplayName(), user.getPreferredLanguage(), pregnancy);
+        return new ProfileResponse(user.getEmail(), user.getDisplayName(), user.getPreferredLanguage(),
+            user.isAppointmentRemindersEnabled(), user.isBrowserNotificationsEnabled(),
+                user.isDailyCareRemindersEnabled(), user.getDailyCareReminderTime(),
+                user.isWeeklyPregnancyRemindersEnabled(), user.getWeeklyPregnancyReminderDay(),
+                user.getWeeklyPregnancyReminderTime(), user.isMissedTaskRemindersEnabled(), pregnancy);
     }
 
     private PregnancySummary pregnancySummary(PregnancyProfile profile) {
@@ -84,8 +119,19 @@ public class ProfileController {
             @Size(max = 3) String bloodGroup) {
     }
 
-    public record ProfileResponse(String email, String displayName, String preferredLanguage,
-            PregnancySummary pregnancy) {
+        public record ProfileUpdateRequest(@NotNull @Size(min = 1, max = 120) String displayName,
+                Boolean appointmentRemindersEnabled, Boolean browserNotificationsEnabled,
+                Boolean dailyCareRemindersEnabled, LocalTime dailyCareReminderTime,
+                Boolean weeklyPregnancyRemindersEnabled, @Min(1) @Max(7) Integer weeklyPregnancyReminderDay,
+                LocalTime weeklyPregnancyReminderTime, Boolean missedTaskRemindersEnabled) {
+    }
+
+        public record ProfileResponse(String email, String displayName, String preferredLanguage,
+                boolean appointmentRemindersEnabled, boolean browserNotificationsEnabled,
+                boolean dailyCareRemindersEnabled, LocalTime dailyCareReminderTime,
+                boolean weeklyPregnancyRemindersEnabled, int weeklyPregnancyReminderDay,
+                LocalTime weeklyPregnancyReminderTime, boolean missedTaskRemindersEnabled,
+                PregnancySummary pregnancy) {
     }
 
     public record PregnancySummary(LocalDate lastMenstrualPeriod, LocalDate dueDate, int currentWeek,

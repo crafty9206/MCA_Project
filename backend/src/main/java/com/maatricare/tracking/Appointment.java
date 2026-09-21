@@ -46,6 +46,9 @@ public class Appointment {
     @Column(length = 1000)
     private String notes;
 
+    @Column(name = "reminder_minutes_before")
+    private Integer reminderMinutesBefore;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -53,7 +56,7 @@ public class Appointment {
     }
 
     public Appointment(User user, String title, OffsetDateTime startsAt, OffsetDateTime endsAt,
-            String providerName, String clinicName, String notes) {
+            String providerName, String clinicName, String notes, Integer reminderMinutesBefore) {
         this.user = user;
         this.title = title;
         this.startsAt = startsAt;
@@ -61,6 +64,7 @@ public class Appointment {
         this.providerName = providerName;
         this.clinicName = clinicName;
         this.notes = notes;
+        this.reminderMinutesBefore = reminderMinutesBefore;
     }
 
     @jakarta.persistence.PrePersist
@@ -69,10 +73,23 @@ public class Appointment {
     }
 
     public UUID getId() { return id; }
+    public User getUser() { return user; }
     public String getTitle() { return title; }
     public OffsetDateTime getStartsAt() { return startsAt; }
     public OffsetDateTime getEndsAt() { return endsAt; }
     public String getProviderName() { return providerName; }
     public String getClinicName() { return clinicName; }
     public String getNotes() { return notes; }
+        public Integer getReminderMinutesBefore() { return reminderMinutesBefore; }
+
+    public void updateDetails(String title, OffsetDateTime startsAt, OffsetDateTime endsAt, String providerName,
+            String clinicName, String notes, Integer reminderMinutesBefore) {
+        this.title = title;
+        this.startsAt = startsAt;
+        this.endsAt = endsAt;
+        this.providerName = providerName;
+        this.clinicName = clinicName;
+        this.notes = notes;
+        this.reminderMinutesBefore = reminderMinutesBefore;
+    }
 }

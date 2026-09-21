@@ -85,4 +85,15 @@ public class PregnancyProfile {
     public BigDecimal getPrePregnancyWeightKg() { return prePregnancyWeightKg; }
     public String getBloodPressure() { return bloodPressure; }
     public String getBloodGroup() { return bloodGroup; }
+
+    public void updateDetails(LocalDate lastMenstrualPeriod, LocalDate dueDate, Integer ageYears,
+            BigDecimal heightCm, BigDecimal prePregnancyWeightKg, String bloodPressure, String bloodGroup) {
+        this.lastMenstrualPeriod = lastMenstrualPeriod;
+        this.dueDate = dueDate;
+        this.ageYears = ageYears;
+        this.heightCm = heightCm;
+        this.prePregnancyWeightKg = prePregnancyWeightKg;
+        this.bloodPressure = bloodPressure;
+        this.bloodGroup = bloodGroup;
+    }
 }

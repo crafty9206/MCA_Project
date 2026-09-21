@@ -13,3 +13,5 @@ spring:
 security:
   jwt:
     secret: test-secret-key-that-is-at-least-32-characters-long
+  password-reset:
+    expose-token: true

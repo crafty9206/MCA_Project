@@ -33,9 +33,9 @@ Build a pregnancy support and care-coordination application using React, Spring 
 - [x] Add Spring Data JPA dependency
 - [x] Create User entity
 - [x] Create PregnancyProfile entity
-- [ ] Create Appointment entity
+- [x] Create Appointment entity
 - [ ] Create SymptomEntry entity
-- [ ] Create CareTask entity
+- [x] Create CareTask entity
 - [ ] Create WeeklyGuide entity
 - [ ] Create UserLanguagePreference entity
 - [x] Add entity relationships and constraints
@@ -52,7 +52,7 @@ Build a pregnancy support and care-coordination application using React, Spring 
 - [x] Add authenticated route protection
 - [ ] Add logout or token invalidation strategy
 - [x] Add user profile retrieval endpoint
-- [ ] Add profile update endpoint
+- [x] Add profile update endpoint
 - [x] Add pregnancy profile creation flow
 - [x] Store last menstrual period or due date securely
 - [x] Calculate current pregnancy week
@@ -62,13 +62,13 @@ Build a pregnancy support and care-coordination application using React, Spring 
 ## Phase 5: Pregnancy Tracking
 
 - [ ] Connect dashboard to real pregnancy profile data
-- [ ] Display current pregnancy week from backend data
+- [x] Display current pregnancy week from backend data
 - [ ] Display progress percentage
 - [ ] Display estimated due date
 - [ ] Add pregnancy milestone tracking
-- [ ] Add daily care task creation
-- [ ] Add daily care task completion endpoint
-- [ ] Add task history
+- [x] Add daily care task creation
+- [x] Add daily care task completion endpoint
+- [x] Add task history
 - [ ] Add hydration tracking
 - [ ] Add prenatal vitamin tracking
 - [ ] Add activity or walking tracking

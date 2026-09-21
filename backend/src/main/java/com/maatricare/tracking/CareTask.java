@@ -17,7 +17,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 
 @Entity
-@Table(name = "care_tasks", uniqueConstraints = @UniqueConstraint(columnNames = { "user_id", "task_date", "title" }))
+@Table(name = "care_tasks", uniqueConstraints = @UniqueConstraint(columnNames = { "user_id", "task_date", "task_detail_id" }))
 public class CareTask {
 
     @Id
@@ -28,8 +28,9 @@ public class CareTask {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(nullable = false, length = 160)
-    private String title;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "task_detail_id", nullable = false)
+    private TaskDetail taskDetail;
 
     @Column(name = "task_date", nullable = false)
     private LocalDate taskDate;
@@ -40,14 +41,15 @@ public class CareTask {
     protected CareTask() {
     }
 
-    public CareTask(User user, String title, LocalDate taskDate) {
+    public CareTask(User user, TaskDetail taskDetail, LocalDate taskDate) {
         this.user = user;
-        this.title = title;
+        this.taskDetail = taskDetail;
         this.taskDate = taskDate;
     }
 
     public UUID getId() { return id; }
-    public String getTitle() { return title; }
+    public User getUser() { return user; }
+    public TaskDetail getTaskDetail() { return taskDetail; }
     public LocalDate getTaskDate() { return taskDate; }
     public boolean isCompleted() { return completed; }
     public void setCompleted(boolean completed) { this.completed = completed; }

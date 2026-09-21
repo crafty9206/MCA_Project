@@ -6,16 +6,22 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.maatricare.security.JwtService;
+import com.maatricare.security.TokenBlacklistService;
 import com.maatricare.user.User;
+import com.maatricare.user.AccountService;
 import com.maatricare.user.UserRepository;
 
 @RestController
@@ -25,11 +31,22 @@ public class AuthController {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final TokenBlacklistService tokenBlacklistService;
+        private final AccountService accountService;
+            private final PasswordResetService passwordResetService;
+            private final boolean exposeResetToken;
 
-    public AuthController(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService) {
+    public AuthController(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService,
+                TokenBlacklistService tokenBlacklistService, AccountService accountService,
+                PasswordResetService passwordResetService,
+                @Value("${security.password-reset.expose-token:false}") boolean exposeResetToken) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.tokenBlacklistService = tokenBlacklistService;
+        this.accountService = accountService;
+        this.passwordResetService = passwordResetService;
+        this.exposeResetToken = exposeResetToken;
     }
 
     @PostMapping("/register")
@@ -51,8 +68,38 @@ public class AuthController {
         return responseFor(user);
     }
 
+    @PostMapping("/forgot-password")
+    public ForgotPasswordResponse forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        String token = passwordResetService.createToken(request.email());
+        return new ForgotPasswordResponse("If the account exists, reset instructions have been created.",
+                exposeResetToken ? token : null);
+    }
+
+    @PostMapping("/reset-password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        passwordResetService.resetPassword(request.token(), request.password());
+    }
+
+    @PostMapping("/logout")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void logout(@RequestHeader(value = "Authorization", required = false) String authorization) {
+        if (authorization == null || !authorization.startsWith("Bearer ")) return;
+        String token = authorization.substring(7);
+        tokenBlacklistService.revoke(token, jwtService.extractExpiration(token));
+    }
+
+    @DeleteMapping("/account")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteAccount(Authentication authentication,
+            @RequestHeader("Authorization") String authorization) {
+        String token = authorization.substring(7);
+        accountService.deleteByEmail(authentication.getName());
+        tokenBlacklistService.revoke(token, jwtService.extractExpiration(token));
+    }
+
     private AuthResponse responseFor(User user) {
-        return new AuthResponse(jwtService.issueToken(user.getEmail()), user.getEmail(), user.getDisplayName());
+        return new AuthResponse(jwtService.issueToken(user.getEmail(), user.getRole()), user.getEmail(), user.getDisplayName(), user.getRole());
     }
 
     public record RegisterRequest(@Email @NotBlank String email,
@@ -63,6 +110,16 @@ public class AuthController {
     public record LoginRequest(@Email @NotBlank String email, @NotBlank String password) {
     }
 
-    public record AuthResponse(String token, String email, String displayName) {
+        public record ForgotPasswordRequest(@Email @NotBlank String email) {
+        }
+
+        public record ForgotPasswordResponse(String message, String resetToken) {
+        }
+
+        public record ResetPasswordRequest(@NotBlank String token,
+            @NotBlank @Size(min = 8, max = 72) String password) {
+        }
+
+    public record AuthResponse(String token, String email, String displayName, String role) {
     }
 }

@@ -8,4 +8,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface PregnancyProfileRepository extends JpaRepository<PregnancyProfile, UUID> {
 
     Optional<PregnancyProfile> findByUserId(UUID userId);
+
+    void deleteByUserId(UUID userId);
 }

@@ -24,14 +24,23 @@ public class JwtService {
         this.expirationMinutes = expirationMinutes;
     }
 
-    public String issueToken(String email) {
+    public String issueToken(String email, String role) {
         Instant now = Instant.now();
-        return Jwts.builder().subject(email).issuedAt(Date.from(now))
+        return Jwts.builder().subject(email).claim("role", role).issuedAt(Date.from(now))
                 .expiration(Date.from(now.plusSeconds(expirationMinutes * 60)))
                 .signWith(signingKey).compact();
     }
 
     public String extractEmail(String token) {
         return Jwts.parser().verifyWith(signingKey).build().parseSignedClaims(token).getPayload().getSubject();
+    }
+
+    public String extractRole(String token) {
+        Object role = Jwts.parser().verifyWith(signingKey).build().parseSignedClaims(token).getPayload().get("role");
+        return role == null ? "USER" : role.toString();
+    }
+
+    public Instant extractExpiration(String token) {
+        return Jwts.parser().verifyWith(signingKey).build().parseSignedClaims(token).getPayload().getExpiration().toInstant();
     }
 }
