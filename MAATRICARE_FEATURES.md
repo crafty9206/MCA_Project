@@ -74,44 +74,41 @@ Legend:
 - [x] Track water intake
 - [x] Track prenatal vitamins
 - [x] Track walking or activity
-- [ ] Track sleep
-- [ ] Track mood
-- [ ] Add daily completion percentage
-- [ ] Add weekly care summary
-- [ ] Add custom care tasks
-- [ ] Add task edit and deletion
-- [ ] Add recurring tasks
+- [x] Track sleep
+- [x] Track mood
+- [x] Add daily completion percentage
+- [x] Add weekly care summary
+- [x] Add custom care tasks
+- [x] Add task edit and deletion
+- [x] Add recurring tasks
 
 ### Symptoms and Journal
 
-- [ ] Create SymptomEntry entity
-- [ ] Create symptom database migration
-- [ ] Create symptom repository
-- [ ] Create symptom API
-- [ ] Create symptom entry form
-- [ ] Add common symptom options
-- [ ] Add symptom severity
-- [ ] Add symptom date and time
-- [ ] Add free-text journal notes
-- [ ] Add symptom and journal history
-- [ ] Add date filtering
-- [ ] Add symptom editing
-- [ ] Add symptom deletion
-- [ ] Add private journal access controls
-- [ ] Add concerning-symptom safety reminder
-- [ ] Confirm that symptom features do not diagnose conditions
+- [x] Create SymptomEntry entity
+- [x] Create symptom database migration
+- [x] Create symptom repository
+- [x] Create symptom API
+- [x] Create symptom entry form
+- [x] Add common symptom options
+- [x] Add symptom severity
+- [x] Add symptom date and time
+- [x] Add free-text journal notes
+- [x] Add symptom and journal history
+- [x] Add date filtering
+- [x] Add symptom editing
+- [x] Add symptom deletion
+- [x] Add private journal access controls
+- [x] Add concerning-symptom safety reminder
+- [x] Confirm that symptom features do not diagnose conditions
 
 ### Pregnancy Milestones
 
-- [ ] Add pregnancy milestone model
-- [ ] Add milestone database migration
-- [ ] Add standard pregnancy milestone timeline
-- [ ] Add custom milestones
-- [ ] Add milestone completion state
-- [ ] Add trimester milestones
-- [ ] Add checkup and screening reminders
-- [ ] Add hospital preparation checklist
-- [ ] Add birth-plan checklist
+- [x] Add pregnancy milestone model
+- [x] Add milestone database migration
+- [x] Add standard pregnancy milestone timeline
+- [x] Add custom milestones
+- [x] Add milestone completion state
+- [x] Add trimester milestones
 
 ## Priority 3: Education and Communication
 
@@ -120,8 +117,6 @@ Legend:
 - [ ] Decide whether guide content is static or admin-managed
 - [ ] Create WeeklyGuide entity
 - [ ] Create weekly-guide migration
-- [ ] Add medically reviewed weekly content
-- [ ] Add weekly guide API
 - [ ] Connect guide to current pregnancy week
 - [ ] Add nutrition guidance
 - [ ] Add safe activity guidance

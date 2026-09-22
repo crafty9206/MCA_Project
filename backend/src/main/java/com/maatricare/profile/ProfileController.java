@@ -21,8 +21,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.maatricare.pregnancy.PregnancyMilestone;
+import com.maatricare.pregnancy.PregnancyMilestoneRepository;
 import com.maatricare.pregnancy.PregnancyProfile;
 import com.maatricare.pregnancy.PregnancyProfileRepository;
+import com.maatricare.tracking.CareTask;
+import com.maatricare.tracking.CareTaskRepository;
+import com.maatricare.tracking.TaskDetailRepository;
 import com.maatricare.user.User;
 import com.maatricare.user.UserRepository;
 
@@ -32,15 +37,24 @@ public class ProfileController {
 
     private final UserRepository userRepository;
     private final PregnancyProfileRepository pregnancyProfileRepository;
+    private final PregnancyMilestoneRepository pregnancyMilestoneRepository;
+    private final CareTaskRepository careTaskRepository;
+    private final TaskDetailRepository taskDetailRepository;
 
-    public ProfileController(UserRepository userRepository, PregnancyProfileRepository pregnancyProfileRepository) {
+    public ProfileController(UserRepository userRepository, PregnancyProfileRepository pregnancyProfileRepository,
+            PregnancyMilestoneRepository pregnancyMilestoneRepository, CareTaskRepository careTaskRepository,
+            TaskDetailRepository taskDetailRepository) {
         this.userRepository = userRepository;
         this.pregnancyProfileRepository = pregnancyProfileRepository;
+        this.pregnancyMilestoneRepository = pregnancyMilestoneRepository;
+        this.careTaskRepository = careTaskRepository;
+        this.taskDetailRepository = taskDetailRepository;
     }
 
     @GetMapping
     public ProfileResponse getProfile(Authentication authentication) {
         User user = currentUser(authentication);
+        ensureDefaultTasks(user, LocalDate.now());
         return toResponse(user, pregnancyProfileRepository.findByUserId(user.getId()).orElse(null));
     }
 
@@ -73,6 +87,7 @@ public class ProfileController {
         PregnancyProfile profile = pregnancyProfileRepository.save(
                 new PregnancyProfile(user, request.lastMenstrualPeriod(), dueDate, request.ageYears(), request.heightCm(),
                         request.prePregnancyWeightKg(), request.bloodPressure(), request.bloodGroup()));
+        createStandardMilestones(user);
         return toResponse(user, profile);
     }
 
@@ -86,6 +101,37 @@ public class ProfileController {
                 request.ageYears(), request.heightCm(), request.prePregnancyWeightKg(), request.bloodPressure(),
                 request.bloodGroup());
         return toResponse(user, pregnancyProfileRepository.save(profile));
+    }
+
+    private void createStandardMilestones(User user) {
+        var milestones = java.util.List.of(
+                new PregnancyMilestone(user, "Confirm pregnancy", "Book the first prenatal appointment and review early pregnancy care guidance.", 4, "STANDARD"),
+                new PregnancyMilestone(user, "First prenatal visit", "Meet with your healthcare professional to review health history and next steps.", 8, "STANDARD"),
+                new PregnancyMilestone(user, "First trimester screening", "Review early screening and bloodwork recommendations with your clinician.", 12, "STANDARD"),
+                new PregnancyMilestone(user, "Second trimester check-in", "Discuss movement, nutrition, and how you are feeling in the second trimester.", 16, "STANDARD"),
+                new PregnancyMilestone(user, "Anatomy scan", "Prepare for the anatomy scan and review the baby's growth and development.", 20, "STANDARD"),
+                new PregnancyMilestone(user, "Glucose screening", "Complete routine glucose screening during the second trimester.", 24, "STANDARD"),
+                new PregnancyMilestone(user, "Third trimester planning", "Review birth preparation, circulation, and follow-up appointments.", 28, "STANDARD"),
+                new PregnancyMilestone(user, "Prepare for birth", "Review hospital plans, transportation, and final checklist items.", 32, "STANDARD"),
+                new PregnancyMilestone(user, "Final prenatal appointments", "Follow up on birth plans, symptoms, and final check-ins with your care team.", 36, "STANDARD"),
+                new PregnancyMilestone(user, "Due date week", "Focus on rest, birth planning, and reaching your due date safely.", 40, "STANDARD")
+        );
+        milestones.forEach(pregnancyMilestoneRepository::save);
+    }
+
+    private void ensureDefaultTasks(User user, LocalDate taskDate) {
+        java.util.List.of(
+                "Take prenatal vitamins",
+                "Drink 8 glasses of water",
+                "Take a 20 minute walk",
+                "Get enough rest"
+        ).forEach(title -> {
+            var taskDetail = taskDetailRepository.findByTitleIgnoreCase(title)
+                    .orElseGet(() -> taskDetailRepository.save(new com.maatricare.tracking.TaskDetail(title, true)));
+            if (!careTaskRepository.existsByUserIdAndTaskDateAndTaskDetailId(user.getId(), taskDate, taskDetail.getId())) {
+                careTaskRepository.save(new CareTask(user, taskDetail, taskDate));
+            }
+        });
     }
 
     private User currentUser(Authentication authentication) {

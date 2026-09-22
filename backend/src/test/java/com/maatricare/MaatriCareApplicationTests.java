@@ -213,6 +213,23 @@ class MaatriCareApplicationTests {
                 .andExpect(jsonPath("$.activityMinutes").value(15))
                 .andExpect(jsonPath("$.activityGoal").value(20));
 
+            mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                .patch("/api/wellbeing/mood")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"date\":\"2026-09-16\",\"mood\":\"Feeling well\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mood").value("Feeling well"));
+
+            mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                .patch("/api/wellbeing/sleep")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"date\":\"2026-09-16\",\"hours\":7.5}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sleepHours").value(7.5))
+                .andExpect(jsonPath("$.sleepGoal").value(8.0));
+
             MvcResult appointment = mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/appointments")
                 .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)

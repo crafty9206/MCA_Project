@@ -37,15 +37,17 @@ public class TrackingController {
     private final CareTaskRepository careTaskRepository;
     private final TaskDetailRepository taskDetailRepository;
         private final AppointmentQuestionRepository appointmentQuestionRepository;
+        private final SymptomEntryRepository symptomEntryRepository;
 
     public TrackingController(UserRepository userRepository, AppointmentRepository appointmentRepository,
             CareTaskRepository careTaskRepository, TaskDetailRepository taskDetailRepository,
-            AppointmentQuestionRepository appointmentQuestionRepository) {
+            AppointmentQuestionRepository appointmentQuestionRepository, SymptomEntryRepository symptomEntryRepository) {
         this.userRepository = userRepository;
         this.appointmentRepository = appointmentRepository;
         this.careTaskRepository = careTaskRepository;
         this.taskDetailRepository = taskDetailRepository;
         this.appointmentQuestionRepository = appointmentQuestionRepository;
+        this.symptomEntryRepository = symptomEntryRepository;
     }
 
     @GetMapping("/appointments")
@@ -120,6 +122,50 @@ public class TrackingController {
         appointmentQuestionRepository.delete(question);
         }
 
+    @GetMapping("/symptoms")
+    public List<SymptomResponse> symptoms(Authentication authentication) {
+        return symptomEntryRepository.findByUserIdOrderByOccurredAtDesc(currentUser(authentication).getId()).stream()
+                .map(this::symptomResponse).toList();
+    }
+
+    @PostMapping("/symptoms")
+    @ResponseStatus(HttpStatus.CREATED)
+    public SymptomResponse createSymptom(Authentication authentication,
+            @Valid @RequestBody SymptomRequest request) {
+        validateSeverity(request.severity());
+        SymptomEntry entry = symptomEntryRepository.save(new SymptomEntry(currentUser(authentication),
+                request.symptom().trim(), request.severity().toUpperCase(), request.occurredAt(), request.notes()));
+        return symptomResponse(entry);
+    }
+
+    @PatchMapping("/symptoms/{id}")
+    public SymptomResponse updateSymptom(Authentication authentication, @PathVariable UUID id,
+            @Valid @RequestBody SymptomRequest request) {
+        validateSeverity(request.severity());
+        SymptomEntry entry = symptomEntryRepository.findByIdAndUserId(id, currentUser(authentication).getId())
+                .orElseThrow(() -> new java.util.NoSuchElementException("Symptom entry not found"));
+        entry.update(request.symptom().trim(), request.severity().toUpperCase(), request.occurredAt(), request.notes());
+        return symptomResponse(symptomEntryRepository.save(entry));
+    }
+
+    @DeleteMapping("/symptoms/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteSymptom(Authentication authentication, @PathVariable UUID id) {
+        SymptomEntry entry = symptomEntryRepository.findByIdAndUserId(id, currentUser(authentication).getId())
+                .orElseThrow(() -> new java.util.NoSuchElementException("Symptom entry not found"));
+        symptomEntryRepository.delete(entry);
+    }
+
+    private void validateSeverity(String severity) {
+        if (!List.of("MILD", "MODERATE", "SEVERE").contains(severity.toUpperCase())) {
+            throw new IllegalArgumentException("Severity must be MILD, MODERATE, or SEVERE");
+        }
+    }
+
+    private SymptomResponse symptomResponse(SymptomEntry entry) {
+        return new SymptomResponse(entry.getId(), entry.getSymptom(), entry.getSeverity(), entry.getOccurredAt(), entry.getNotes());
+    }
+
     @GetMapping("/tasks")
     public List<TaskResponse> tasks(Authentication authentication, @RequestParam(required = false) LocalDate date,
             @RequestParam(required = false) LocalDate from, @RequestParam(required = false) LocalDate to) {
@@ -139,21 +185,38 @@ public class TrackingController {
     }
 
     private void assignSharedTasks(User user, LocalDate taskDate) {
-        taskDetailRepository.findAllByOrderByTitleAsc().stream()
+        taskDetailRepository.findBySharedTrueOrderByTitleAsc().stream()
             .filter(taskDetail -> !careTaskRepository.existsByUserIdAndTaskDateAndTaskDetailId(
                 user.getId(), taskDate, taskDetail.getId()))
             .map(taskDetail -> new CareTask(user, taskDetail, taskDate))
                 .forEach(careTaskRepository::save);
+            careTaskRepository.findByUserId(user.getId()).stream()
+                .map(CareTask::getTaskDetail)
+                .filter(detail -> !detail.isShared() && !"NONE".equals(detail.getRecurrence()))
+                .filter(detail -> isDue(detail, taskDate))
+                .filter(detail -> !careTaskRepository.existsByUserIdAndTaskDateAndTaskDetailId(user.getId(), taskDate, detail.getId()))
+                .map(detail -> new CareTask(user, detail, taskDate))
+                .forEach(careTaskRepository::save);
     }
+
+            private boolean isDue(TaskDetail detail, LocalDate date) {
+            if (detail.getRecurrenceStartDate() == null || date.isBefore(detail.getRecurrenceStartDate())) return false;
+            return "DAILY".equals(detail.getRecurrence())
+                || "WEEKLY".equals(detail.getRecurrence()) && date.getDayOfWeek() == detail.getRecurrenceStartDate().getDayOfWeek();
+            }
 
     @PostMapping("/tasks")
     @ResponseStatus(HttpStatus.CREATED)
     public TaskResponse createTask(Authentication authentication, @Valid @RequestBody TaskRequest request) {
+        String recurrence = request.recurrence() == null ? "NONE" : request.recurrence().toUpperCase();
+        if (!List.of("NONE", "DAILY", "WEEKLY").contains(recurrence)) {
+            throw new IllegalArgumentException("Recurrence must be NONE, DAILY, or WEEKLY");
+        }
         TaskDetail taskDetail = taskDetailRepository.findByTitleIgnoreCase(request.title().trim())
-            .orElseGet(() -> taskDetailRepository.save(new TaskDetail(request.title().trim())));
+            .orElseGet(() -> taskDetailRepository.save(new TaskDetail(request.title().trim(), false, recurrence, request.taskDate())));
         CareTask task = careTaskRepository.save(new CareTask(currentUser(authentication), taskDetail, request.taskDate()));
         return new TaskResponse(task.getId(), taskDetail.getId(), taskDetail.getTitle(), task.getTaskDate(),
-            task.isCompleted());
+            task.isCompleted(), taskDetail.isShared());
     }
 
     @PatchMapping("/tasks/{id}/complete")
@@ -163,6 +226,29 @@ public class TrackingController {
         task.setCompleted(request.completed());
         careTaskRepository.save(task);
         return taskResponse(task);
+    }
+
+    @PatchMapping("/tasks/{id}")
+    public TaskResponse updateTask(Authentication authentication, @PathVariable UUID id,
+            @Valid @RequestBody TaskUpdateRequest request) {
+        CareTask task = careTaskRepository.findByIdAndUserId(id, currentUser(authentication).getId())
+                .orElseThrow(() -> new java.util.NoSuchElementException("Care task not found"));
+        if (task.getTaskDetail().isShared()) {
+            throw new IllegalStateException("Shared care tasks can only be changed by an administrator");
+        }
+        task.getTaskDetail().setTitle(request.title().trim());
+        return taskResponse(careTaskRepository.save(task));
+    }
+
+    @DeleteMapping("/tasks/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteTask(Authentication authentication, @PathVariable UUID id) {
+        CareTask task = careTaskRepository.findByIdAndUserId(id, currentUser(authentication).getId())
+                .orElseThrow(() -> new java.util.NoSuchElementException("Care task not found"));
+        if (task.getTaskDetail().isShared()) {
+            throw new IllegalStateException("Shared care tasks can only be removed by an administrator");
+        }
+        careTaskRepository.delete(task);
     }
 
     private User currentUser(Authentication authentication) {
@@ -178,7 +264,7 @@ public class TrackingController {
     private TaskResponse taskResponse(CareTask task) {
         TaskDetail taskDetail = task.getTaskDetail();
         return new TaskResponse(task.getId(), taskDetail.getId(), taskDetail.getTitle(), task.getTaskDate(),
-                task.isCompleted());
+            task.isCompleted(), taskDetail.isShared());
     }
 
     private QuestionResponse questionResponse(AppointmentQuestion question) {
@@ -194,7 +280,13 @@ public class TrackingController {
     public record QuestionRequest(@NotBlank @Size(max = 500) String question) {}
     public record QuestionUpdateRequest(@NotBlank @Size(max = 500) String question, boolean answered) {}
     public record QuestionResponse(UUID id, UUID appointmentId, String question, boolean answered) {}
-    public record TaskRequest(@NotBlank @Size(max = 160) String title, @NotNull LocalDate taskDate) {}
+        public record SymptomRequest(@NotBlank @Size(max = 80) String symptom,
+            @NotBlank String severity, @NotNull OffsetDateTime occurredAt, @Size(max = 1000) String notes) {}
+        public record SymptomResponse(UUID id, String symptom, String severity, OffsetDateTime occurredAt, String notes) {}
+        public record TaskRequest(@NotBlank @Size(max = 160) String title, @NotNull LocalDate taskDate,
+            String recurrence) {}
+    public record TaskUpdateRequest(@NotBlank @Size(max = 160) String title) {}
     public record CompletionRequest(boolean completed) {}
-    public record TaskResponse(UUID id, UUID taskDetailId, String title, LocalDate taskDate, boolean completed) {}
+        public record TaskResponse(UUID id, UUID taskDetailId, String title, LocalDate taskDate, boolean completed,
+            boolean shared) {}
 }

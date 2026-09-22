@@ -1,11 +1,13 @@
 package com.maatricare.tracking;
 
 import java.time.LocalDate;
+import java.math.BigDecimal;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 
+import jakarta.validation.constraints.Size;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -67,18 +69,42 @@ public class WellbeingController {
         return response(wellbeingRepository.save(wellbeing));
     }
 
+    @PatchMapping("/mood")
+    public WellbeingResponse updateMood(Authentication authentication,
+            @Valid @RequestBody MoodRequest request) {
+        User user = currentUser(authentication);
+        DailyWellbeing wellbeing = wellbeingRepository.findByUserIdAndEntryDate(user.getId(), request.date())
+                .orElseGet(() -> new DailyWellbeing(user, request.date()));
+        wellbeing.setMood(request.mood());
+        return response(wellbeingRepository.save(wellbeing));
+    }
+
+    @PatchMapping("/sleep")
+    public WellbeingResponse updateSleep(Authentication authentication,
+            @Valid @RequestBody SleepRequest request) {
+        User user = currentUser(authentication);
+        DailyWellbeing wellbeing = wellbeingRepository.findByUserIdAndEntryDate(user.getId(), request.date())
+                .orElseGet(() -> new DailyWellbeing(user, request.date()));
+        wellbeing.setSleepHours(request.hours());
+        return response(wellbeingRepository.save(wellbeing));
+    }
+
     private User currentUser(Authentication authentication) {
         return userRepository.findByEmailIgnoreCase(authentication.getName()).orElseThrow();
     }
 
     private WellbeingResponse response(DailyWellbeing wellbeing) {
         return new WellbeingResponse(wellbeing.getEntryDate(), wellbeing.getWaterGlasses(), 8,
-            wellbeing.isPrenatalVitaminTaken(), wellbeing.getActivityMinutes(), 20);
+            wellbeing.isPrenatalVitaminTaken(), wellbeing.getActivityMinutes(), 20, wellbeing.getMood(),
+            wellbeing.getSleepHours(), new BigDecimal("8.0"));
     }
 
     public record WaterRequest(LocalDate date, @Min(0) @Max(30) int glasses) {}
     public record VitaminRequest(LocalDate date, boolean taken) {}
-        public record ActivityRequest(LocalDate date, @Min(0) @Max(300) int minutes) {}
+    public record ActivityRequest(LocalDate date, @Min(0) @Max(300) int minutes) {}
+    public record MoodRequest(LocalDate date, @Size(max = 40) String mood) {}
+        public record SleepRequest(LocalDate date, @Min(0) @Max(24) BigDecimal hours) {}
     public record WellbeingResponse(LocalDate date, int waterGlasses, int waterGoal,
-            boolean prenatalVitaminTaken, int activityMinutes, int activityGoal) {}
+            boolean prenatalVitaminTaken, int activityMinutes, int activityGoal, String mood,
+            BigDecimal sleepHours, BigDecimal sleepGoal) {}
 }

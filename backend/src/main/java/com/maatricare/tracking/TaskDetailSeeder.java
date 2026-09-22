@@ -26,6 +26,6 @@ public class TaskDetailSeeder implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         DEFAULT_TASKS.forEach(title -> taskDetailRepository.findByTitleIgnoreCase(title)
-                .orElseGet(() -> taskDetailRepository.save(new TaskDetail(title))));
+                .orElseGet(() -> taskDetailRepository.save(new TaskDetail(title, true))));
     }
 }

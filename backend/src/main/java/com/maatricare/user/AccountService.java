@@ -8,6 +8,8 @@ import com.maatricare.auth.PasswordResetTokenRepository;
 import com.maatricare.tracking.AppointmentRepository;
 import com.maatricare.tracking.CareTaskRepository;
 import com.maatricare.tracking.DailyWellbeingRepository;
+import com.maatricare.tracking.SymptomEntryRepository;
+import com.maatricare.pregnancy.PregnancyMilestoneRepository;
 
 @Service
 public class AccountService {
@@ -18,17 +20,22 @@ public class AccountService {
     private final CareTaskRepository careTaskRepository;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final DailyWellbeingRepository dailyWellbeingRepository;
+    private final SymptomEntryRepository symptomEntryRepository;
+    private final PregnancyMilestoneRepository pregnancyMilestoneRepository;
 
     public AccountService(UserRepository userRepository, PregnancyProfileRepository pregnancyProfileRepository,
             AppointmentRepository appointmentRepository, CareTaskRepository careTaskRepository,
             PasswordResetTokenRepository passwordResetTokenRepository,
-            DailyWellbeingRepository dailyWellbeingRepository) {
+            DailyWellbeingRepository dailyWellbeingRepository, SymptomEntryRepository symptomEntryRepository,
+            PregnancyMilestoneRepository pregnancyMilestoneRepository) {
         this.userRepository = userRepository;
         this.pregnancyProfileRepository = pregnancyProfileRepository;
         this.appointmentRepository = appointmentRepository;
         this.careTaskRepository = careTaskRepository;
         this.passwordResetTokenRepository = passwordResetTokenRepository;
         this.dailyWellbeingRepository = dailyWellbeingRepository;
+        this.symptomEntryRepository = symptomEntryRepository;
+        this.pregnancyMilestoneRepository = pregnancyMilestoneRepository;
     }
 
     @Transactional
@@ -37,6 +44,8 @@ public class AccountService {
                 .orElseThrow(() -> new java.util.NoSuchElementException("User not found"));
         passwordResetTokenRepository.deleteByUserId(user.getId());
         dailyWellbeingRepository.deleteByUserId(user.getId());
+        symptomEntryRepository.deleteByUserId(user.getId());
+        pregnancyMilestoneRepository.deleteByUserId(user.getId());
         careTaskRepository.deleteByUserId(user.getId());
         appointmentRepository.deleteByUserId(user.getId());
         pregnancyProfileRepository.deleteByUserId(user.getId());

@@ -4,18 +4,23 @@ import { AuthFlow } from './components/AuthFlow'
 import { LandingPage } from './components/LandingPage'
 import { AdminPanel } from './components/AdminPanel'
 import { ProfileSettings } from './components/ProfileSettings'
-import { completeTask, deleteAccount, getAppointments, getProfile, getTaskHistory, getTasks, getWellbeing, logout, updateActivity, updatePrenatalVitamin, updateWater } from './api'
-import type { Appointment, CareTask, DailyWellbeing, DashboardProfile } from './api'
+import { completeTask, deleteAccount, getAppointments, getMilestones, getProfile, getSymptoms, getTaskHistory, getTasks, getWellbeing, logout, updateActivity, updateMood, updatePrenatalVitamin, updateSleep, updateWater } from './api'
+import type { Appointment, CareTask, DailyWellbeing, DashboardProfile, PregnancyMilestone, SymptomEntry } from './api'
 import { CareChecklist } from './components/CareChecklist'
 import { ExerciseCard } from './components/ExerciseCard'
 import { HydrationCard } from './components/HydrationCard'
 import { PrenatalVitaminCard } from './components/PrenatalVitaminCard'
 import { ActivityCard } from './components/ActivityCard'
+import { SleepCard } from './components/SleepCard'
+import { DailyCompletionCard } from './components/DailyCompletionCard'
+import { WeeklyCareSummary } from './components/WeeklyCareSummary'
 import { JournalCard } from './components/JournalCard'
 import { PregnancyStatus } from './components/PregnancyStatus'
+import { PregnancyMilestoneCard } from './components/PregnancyMilestoneCard'
 import { Topbar } from './components/Topbar'
 import { WeeklyGuide } from './components/WeeklyGuide'
 import { WelcomeSection } from './components/WelcomeSection'
+import { ResourceLibraryCard } from './components/ResourceLibraryCard'
 import './App.css'
 
 function App() {
@@ -23,6 +28,8 @@ function App() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [tasks, setTasks] = useState<CareTask[]>([])
   const [taskHistory, setTaskHistory] = useState<CareTask[]>([])
+  const [symptoms, setSymptoms] = useState<SymptomEntry[]>([])
+  const [milestones, setMilestones] = useState<PregnancyMilestone[]>([])
   const [wellbeing, setWellbeing] = useState<DailyWellbeing | null>(null)
   const [savingWater, setSavingWater] = useState(false)
   const [dashboardError, setDashboardError] = useState('')
@@ -32,7 +39,6 @@ function App() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [language, setLanguage] = useState('English')
-  const [selectedSymptom, setSelectedSymptom] = useState<string | null>(null)
   const [activeNav, setActiveNav] = useState('Overview')
   const [authScreen, setAuthScreen] = useState<'landing' | 'signup' | 'signin'>(() => {
     const savedScreen = sessionStorage.getItem('maatricare-auth-screen')
@@ -87,6 +93,10 @@ function App() {
     }
   }
 
+  const addCustomTask = (task: CareTask) => setTasks((current) => [...current, task])
+  const updateCustomTask = (task: CareTask) => setTasks((current) => current.map((item) => item.id === task.id ? task : item))
+  const deleteCustomTask = (id: string) => setTasks((current) => current.filter((task) => task.id !== id))
+
   const addAppointment = (appointment: Appointment) => {
     setAppointments((currentAppointments) => [...currentAppointments, appointment].sort((first, second) => first.startsAt.localeCompare(second.startsAt)))
   }
@@ -128,6 +138,37 @@ function App() {
     catch { setWellbeing(previous); setDashboardError('Your activity could not be saved.') }
   }
 
+  const changeMood = async (mood: string) => {
+    const token = sessionStorage.getItem('maatricare-token')
+    if (!token) return
+
+    let currentWellbeing = wellbeing
+    if (!currentWellbeing) {
+      const today = new Date().toISOString().slice(0, 10)
+      try {
+        currentWellbeing = await getWellbeing(token, today)
+        setWellbeing(currentWellbeing)
+      } catch {
+        setDashboardError('Your wellbeing check-in could not be loaded.')
+        return
+      }
+    }
+
+    const previous = currentWellbeing
+    setWellbeing({ ...currentWellbeing, mood })
+    try { setWellbeing(await updateMood(token, currentWellbeing.date, mood)) }
+    catch { setWellbeing(previous); setDashboardError('Your wellbeing check-in could not be saved.') }
+  }
+
+  const changeSleep = async (hours: number) => {
+    const token = sessionStorage.getItem('maatricare-token')
+    if (!token || !wellbeing) return
+    const previous = wellbeing
+    setWellbeing({ ...wellbeing, sleepHours: hours })
+    try { setWellbeing(await updateSleep(token, wellbeing.date, hours)) }
+    catch { setWellbeing(previous); setDashboardError('Your sleep record could not be saved.') }
+  }
+
   const loadTrackingData = async (token: string) => {
     const todayDate = new Date()
     const historyStartDate = new Date(todayDate)
@@ -135,16 +176,20 @@ function App() {
     historyStartDate.setDate(historyStartDate.getDate() - 7)
     historyEndDate.setDate(historyEndDate.getDate() - 1)
     const localDate = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-    const [loadedAppointments, loadedTasks, loadedHistory, loadedWellbeing] = await Promise.all([
+    const [loadedAppointments, loadedTasks, loadedHistory, loadedWellbeing, loadedSymptoms, loadedMilestones] = await Promise.all([
       getAppointments(token),
       getTasks(token, localDate(todayDate)),
       getTaskHistory(token, localDate(historyStartDate), localDate(historyEndDate)),
       getWellbeing(token, localDate(todayDate)),
+      getSymptoms(token),
+      getMilestones(token),
     ])
     setAppointments(loadedAppointments)
     setTasks(loadedTasks)
     setTaskHistory(loadedHistory)
     setWellbeing(loadedWellbeing)
+    setSymptoms(loadedSymptoms)
+    setMilestones(loadedMilestones)
   }
 
   const completeAuthentication = async (loadedProfile: DashboardProfile) => {
@@ -181,14 +226,19 @@ function App() {
         <WelcomeSection name={profile.displayName} />
         {profile.pregnancy && <PregnancyStatus pregnancy={profile.pregnancy} />}
         <div className="dashboard-grid">
-          <CareChecklist tasks={tasks} history={taskHistory} onToggle={toggleTask} />
+          <CareChecklist tasks={tasks} history={taskHistory} onToggle={toggleTask} onCreated={addCustomTask} onUpdated={updateCustomTask} onDeleted={deleteCustomTask} />
+          <AppointmentCard appointments={appointments} onCreated={addAppointment} onUpdated={updateAppointmentInList} onDeleted={deleteAppointmentFromList} />
+          <PregnancyMilestoneCard milestones={milestones} onRefresh={async () => { const token = sessionStorage.getItem('maatricare-token'); if (token) setMilestones(await getMilestones(token)) }} />
+          <JournalCard selected={wellbeing?.mood ?? null} onSelect={changeMood} entries={symptoms} onCreated={(entry) => setSymptoms((current) => [entry, ...current])} onUpdated={(entry) => setSymptoms((current) => current.map((item) => item.id === entry.id ? entry : item))} onDeleted={(id) => setSymptoms((current) => current.filter((item) => item.id !== id))} />
           <HydrationCard wellbeing={wellbeing} onChange={changeWater} disabled={savingWater} />
           <PrenatalVitaminCard wellbeing={wellbeing} onChange={changeVitamin} />
           <ActivityCard wellbeing={wellbeing} onChange={changeActivity} />
-          <AppointmentCard appointments={appointments} onCreated={addAppointment} onUpdated={updateAppointmentInList} onDeleted={deleteAppointmentFromList} />
-          <JournalCard selected={selectedSymptom} onSelect={setSelectedSymptom} />
+          <SleepCard wellbeing={wellbeing} onChange={changeSleep} />
+          <DailyCompletionCard tasks={tasks} wellbeing={wellbeing} />
+          <WeeklyCareSummary history={taskHistory} todayTasks={tasks} />
           <ExerciseCard />
-          <WeeklyGuide />
+          <WeeklyGuide currentWeek={profile.pregnancy?.currentWeek ?? 24} trimester={profile.pregnancy?.trimester ?? 'Second trimester'} />
+          <ResourceLibraryCard />
         </div>
         {dashboardError && <p className="dashboard-error" role="alert">{dashboardError}</p>}
         <p className="disclaimer">MaatriCare provides organization and educational support. It does not provide medical diagnosis or replace advice from your healthcare professional.</p>

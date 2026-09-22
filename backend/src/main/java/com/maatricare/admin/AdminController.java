@@ -58,12 +58,12 @@ public class AdminController {
     @ResponseStatus(HttpStatus.CREATED)
     public TaskResponse createTask(@Valid @RequestBody AdminTaskRequest request) {
         TaskDetail taskDetail = taskDetailRepository.findByTitleIgnoreCase(request.title().trim())
-            .orElseGet(() -> taskDetailRepository.save(new TaskDetail(request.title().trim())));
+            .orElseGet(() -> taskDetailRepository.save(new TaskDetail(request.title().trim(), true)));
         List<TaskResponse> created = userRepository.findByRoleOrderByEmailAsc("USER").stream()
             .filter(user -> !careTaskRepository.existsByUserIdAndTaskDateAndTaskDetailId(user.getId(), request.taskDate(), taskDetail.getId()))
             .map(user -> careTaskRepository.save(new CareTask(user, taskDetail, request.taskDate())))
             .map(task -> new TaskResponse(task.getId(), taskDetail.getId(), task.getUser().getEmail(),
-                    taskDetail.getTitle(), task.getTaskDate(), task.isCompleted()))
+                    taskDetail.getTitle(), task.getTaskDate(), task.isCompleted(), taskDetail.isShared()))
             .toList();
         if (created.isEmpty()) {
             throw new IllegalStateException("This task already exists for every user on that date");
@@ -78,7 +78,7 @@ public class AdminController {
         TaskDetail taskDetail = task.getTaskDetail();
         careTaskRepository.save(task);
         return new TaskResponse(task.getId(), taskDetail.getId(), task.getUser().getEmail(), taskDetail.getTitle(),
-            task.getTaskDate(), task.isCompleted());
+            task.getTaskDate(), task.isCompleted(), taskDetail.isShared());
     }
 
     @DeleteMapping("/tasks/{id}")
@@ -125,7 +125,7 @@ public class AdminController {
     private TaskResponse taskResponse(CareTask task) {
         TaskDetail taskDetail = task.getTaskDetail();
         return new TaskResponse(task.getId(), taskDetail.getId(), task.getUser().getEmail(), taskDetail.getTitle(),
-                task.getTaskDate(), task.isCompleted());
+            task.getTaskDate(), task.isCompleted(), taskDetail.isShared());
     }
 
     private AppointmentResponse appointmentResponse(Appointment appointment) {
@@ -135,8 +135,8 @@ public class AdminController {
     }
 
     public record UserResponse(String email, String displayName, String role) {}
-        public record TaskResponse(UUID id, UUID taskDetailId, String userEmail, String title, LocalDate taskDate,
-            boolean completed) {}
+            public record TaskResponse(UUID id, UUID taskDetailId, String userEmail, String title, LocalDate taskDate,
+                boolean completed, boolean shared) {}
     public record AdminTaskRequest(@NotBlank @Size(max = 160) String title, @NotNull LocalDate taskDate) {}
     public record AdminTaskUpdateRequest(boolean completed) {}
     public record AppointmentResponse(UUID id, String userEmail, String title, OffsetDateTime startsAt,

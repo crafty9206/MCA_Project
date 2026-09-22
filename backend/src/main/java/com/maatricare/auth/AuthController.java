@@ -18,8 +18,13 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
+
 import com.maatricare.security.JwtService;
 import com.maatricare.security.TokenBlacklistService;
+import com.maatricare.tracking.CareTask;
+import com.maatricare.tracking.CareTaskRepository;
+import com.maatricare.tracking.TaskDetailRepository;
 import com.maatricare.user.User;
 import com.maatricare.user.AccountService;
 import com.maatricare.user.UserRepository;
@@ -32,13 +37,16 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final TokenBlacklistService tokenBlacklistService;
-        private final AccountService accountService;
-            private final PasswordResetService passwordResetService;
-            private final boolean exposeResetToken;
+    private final AccountService accountService;
+    private final PasswordResetService passwordResetService;
+    private final CareTaskRepository careTaskRepository;
+    private final TaskDetailRepository taskDetailRepository;
+    private final boolean exposeResetToken;
 
     public AuthController(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService,
                 TokenBlacklistService tokenBlacklistService, AccountService accountService,
-                PasswordResetService passwordResetService,
+                PasswordResetService passwordResetService, CareTaskRepository careTaskRepository,
+                TaskDetailRepository taskDetailRepository,
                 @Value("${security.password-reset.expose-token:false}") boolean exposeResetToken) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -46,6 +54,8 @@ public class AuthController {
         this.tokenBlacklistService = tokenBlacklistService;
         this.accountService = accountService;
         this.passwordResetService = passwordResetService;
+        this.careTaskRepository = careTaskRepository;
+        this.taskDetailRepository = taskDetailRepository;
         this.exposeResetToken = exposeResetToken;
     }
 
@@ -57,6 +67,7 @@ public class AuthController {
             throw new IllegalArgumentException("An account with this email already exists");
         }
         User user = userRepository.save(new User(email, passwordEncoder.encode(request.password()), request.displayName().trim()));
+        ensureDefaultTasks(user, LocalDate.now());
         return responseFor(user);
     }
 
@@ -100,6 +111,21 @@ public class AuthController {
 
     private AuthResponse responseFor(User user) {
         return new AuthResponse(jwtService.issueToken(user.getEmail(), user.getRole()), user.getEmail(), user.getDisplayName(), user.getRole());
+    }
+
+    private void ensureDefaultTasks(User user, LocalDate taskDate) {
+        java.util.List.of(
+                "Take prenatal vitamins",
+                "Drink 8 glasses of water",
+                "Take a 20 minute walk",
+                "Get enough rest"
+        ).forEach(title -> {
+            var taskDetail = taskDetailRepository.findByTitleIgnoreCase(title)
+                    .orElseGet(() -> taskDetailRepository.save(new com.maatricare.tracking.TaskDetail(title, true)));
+            if (!careTaskRepository.existsByUserIdAndTaskDateAndTaskDetailId(user.getId(), taskDate, taskDetail.getId())) {
+                careTaskRepository.save(new com.maatricare.tracking.CareTask(user, taskDetail, taskDate));
+            }
+        });
     }
 
     public record RegisterRequest(@Email @NotBlank String email,

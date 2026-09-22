@@ -1,6 +1,7 @@
 package com.maatricare.tracking;
 
 import java.time.LocalDate;
+import java.math.BigDecimal;
 import java.util.UUID;
 
 import com.maatricare.user.User;
@@ -40,6 +41,12 @@ public class DailyWellbeing {
     @Column(name = "activity_minutes", nullable = false)
     private int activityMinutes;
 
+    @Column(length = 40)
+    private String mood;
+
+    @Column(name = "sleep_hours", precision = 3, scale = 1, nullable = false)
+    private BigDecimal sleepHours = BigDecimal.ZERO;
+
     protected DailyWellbeing() {
     }
 
@@ -56,4 +63,8 @@ public class DailyWellbeing {
     public void setPrenatalVitaminTaken(boolean prenatalVitaminTaken) { this.prenatalVitaminTaken = prenatalVitaminTaken; }
     public int getActivityMinutes() { return activityMinutes; }
     public void setActivityMinutes(int activityMinutes) { this.activityMinutes = activityMinutes; }
+    public String getMood() { return mood; }
+    public void setMood(String mood) { this.mood = mood; }
+    public BigDecimal getSleepHours() { return sleepHours; }
+    public void setSleepHours(BigDecimal sleepHours) { this.sleepHours = sleepHours; }
 }

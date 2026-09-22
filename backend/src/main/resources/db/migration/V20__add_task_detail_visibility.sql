@@ -1,0 +1,2 @@
+ALTER TABLE task_details
+    ADD COLUMN shared BOOLEAN NOT NULL DEFAULT TRUE;

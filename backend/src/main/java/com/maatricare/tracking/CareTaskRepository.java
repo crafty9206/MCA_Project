@@ -24,4 +24,6 @@ public interface CareTaskRepository extends JpaRepository<CareTask, UUID> {
 
     boolean existsByUserIdAndTaskDateAndTaskDetailId(UUID userId, LocalDate taskDate, UUID taskDetailId);
     void deleteByUserId(UUID userId);
+    @EntityGraph(attributePaths = "taskDetail")
+    List<CareTask> findByUserId(UUID userId);
 }

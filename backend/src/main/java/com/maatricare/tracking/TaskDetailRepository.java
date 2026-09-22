@@ -9,4 +9,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface TaskDetailRepository extends JpaRepository<TaskDetail, UUID> {
     Optional<TaskDetail> findByTitleIgnoreCase(String title);
     List<TaskDetail> findAllByOrderByTitleAsc();
+    List<TaskDetail> findBySharedTrueOrderByTitleAsc();
 }
