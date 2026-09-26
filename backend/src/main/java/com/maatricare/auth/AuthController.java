@@ -17,8 +17,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
+
+import jakarta.servlet.http.HttpServletRequest;
 
 import com.maatricare.security.JwtService;
 import com.maatricare.security.TokenBlacklistService;
@@ -41,12 +44,15 @@ public class AuthController {
     private final PasswordResetService passwordResetService;
     private final CareTaskRepository careTaskRepository;
     private final TaskDetailRepository taskDetailRepository;
+    private final LoginAttemptService loginAttemptService;
     private final boolean exposeResetToken;
+
+    private static final String DUMMY_PASSWORD_HASH = "$2a$10$7EqJtq98hPqEX7fNZaFWoO5t10VhZ.HA8v3zF.7j8WHJ7Qh0I8R4C";
 
     public AuthController(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService,
                 TokenBlacklistService tokenBlacklistService, AccountService accountService,
                 PasswordResetService passwordResetService, CareTaskRepository careTaskRepository,
-                TaskDetailRepository taskDetailRepository,
+                TaskDetailRepository taskDetailRepository, LoginAttemptService loginAttemptService,
                 @Value("${security.password-reset.expose-token:false}") boolean exposeResetToken) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -56,6 +62,7 @@ public class AuthController {
         this.passwordResetService = passwordResetService;
         this.careTaskRepository = careTaskRepository;
         this.taskDetailRepository = taskDetailRepository;
+        this.loginAttemptService = loginAttemptService;
         this.exposeResetToken = exposeResetToken;
     }
 
@@ -72,10 +79,23 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public AuthResponse login(@Valid @RequestBody LoginRequest request) {
-        User user = userRepository.findByEmailIgnoreCase(request.email().trim().toLowerCase())
-                .filter(candidate -> passwordEncoder.matches(request.password(), candidate.getPasswordHash()))
-                .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
+    public AuthResponse login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
+        String email = request.email().trim().toLowerCase();
+        String attemptKey = email + "|" + httpRequest.getRemoteAddr();
+        if (loginAttemptService.isBlocked(attemptKey)) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "Too many failed login attempts. Try again in "
+                            + loginAttemptService.retryAfterSeconds(attemptKey) + " seconds.");
+        }
+
+        User user = userRepository.findByEmailIgnoreCase(email).orElse(null);
+        boolean passwordMatches = passwordEncoder.matches(request.password(),
+                user == null ? DUMMY_PASSWORD_HASH : user.getPasswordHash());
+        if (user == null || !passwordMatches) {
+            loginAttemptService.recordFailure(attemptKey);
+            throw new BadCredentialsException("Invalid email or password");
+        }
+        loginAttemptService.recordSuccess(attemptKey);
         return responseFor(user);
     }
 

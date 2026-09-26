@@ -81,6 +81,8 @@ Legend:
 - [x] Add custom care tasks
 - [x] Add task edit and deletion
 - [x] Add recurring tasks
+- [x] Add capacity-aware Gentle Day Planner
+- [x] Persist daily energy and focus-list size
 
 ### Symptoms and Journal
 
@@ -114,39 +116,48 @@ Legend:
 
 ### Weekly Pregnancy Guide
 
-- [ ] Decide whether guide content is static or admin-managed
+- [x] Decide whether guide content is static or admin-managed
 - [ ] Create WeeklyGuide entity
 - [ ] Create weekly-guide migration
-- [ ] Connect guide to current pregnancy week
-- [ ] Add nutrition guidance
-- [ ] Add safe activity guidance
-- [ ] Add common body-change information
-- [ ] Add questions to discuss with a healthcare professional
-- [ ] Add content versioning
-- [ ] Add content review date
+- [x] Add weekly guide API
+- [x] Connect guide to current pregnancy week
+- [x] Add nutrition guidance
+- [x] Add safe activity guidance
+- [x] Add common body-change information
+- [x] Add questions to discuss with a healthcare professional
+- [x] Add content versioning
+- [x] Add content review date
 
 ### Resource Library
 
-- [ ] Add resource categories
-- [ ] Add searchable resources
-- [ ] Add nutrition resources
-- [ ] Add exercise resources
-- [ ] Add mental wellbeing resources
-- [ ] Add postpartum resources
-- [ ] Add newborn preparation resources
-- [ ] Add hospital and emergency resources
+- [x] Add resource categories
+- [x] Add searchable resources
+- [x] Add nutrition resources
+- [x] Add exercise resources
+- [x] Add mental wellbeing resources
+- [x] Add postpartum resources
+- [x] Add newborn preparation resources
+- [x] Add hospital and emergency resources
 - [ ] Add medically reviewed content labels
 
 ### Healthcare Sharing
 
-- [ ] Export pregnancy summary
-- [ ] Export appointment history
-- [ ] Export symptom and journal history
-- [ ] Export tracking summaries
-- [ ] Generate PDF report
-- [ ] Add secure time-limited sharing link
-- [ ] Allow users to revoke shared access
-- [ ] Record sharing activity in audit logs
+- [x] Export pregnancy summary
+- [x] Export appointment history
+- [x] Export symptom and journal history
+- [x] Export tracking summaries
+- [x] Generate PDF report
+- [x] Add secure time-limited sharing link
+- [x] Allow users to revoke shared access
+- [x] Record sharing activity in audit logs
+
+### Lab Report Education
+
+- [x] Add manual lab-value entry
+- [x] Compare values with laboratory reference ranges
+- [x] Add curated nutrient food-source guidance
+- [x] Avoid diagnosis and supplement dosing
+- [x] Keep entered lab values transient and unstored
 
 ## Priority 4: Notifications and Personalization
 
@@ -172,6 +183,7 @@ Legend:
 - [ ] Add backend language preference update endpoint
 - [ ] Add localized date formatting
 - [ ] Add localized time formatting
+- [x] Provide Chrome Translate guidance
 - [ ] Test longer translated text on mobile
 - [ ] Decide whether educational and AI content follows language preference
 
@@ -179,16 +191,16 @@ Legend:
 
 - [x] Add token logout or invalidation strategy
 - [ ] Add account deletion capability
-- [ ] Add authorization tests for every user-owned resource
-- [ ] Test cross-user appointment access
-- [ ] Test cross-user task access
-- [ ] Test cross-user profile access
+- [x] Add authorization tests for every user-owned resource
+- [x] Test cross-user appointment access
+- [x] Test cross-user task access
+- [x] Test cross-user profile access
 - [ ] Externalize production CORS origins
 - [ ] Store secrets only in environment variables
 - [ ] Add secure password policy
-- [ ] Add login rate limiting
-- [ ] Add failed-login protection
-- [ ] Add security headers
+- [x] Add login rate limiting
+- [x] Add failed-login protection
+- [x] Add security headers
 - [ ] Avoid sensitive health data in logs
 - [ ] Add audit logging
 - [ ] Document data retention

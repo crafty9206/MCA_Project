@@ -10,7 +10,26 @@ export type AppointmentQuestion = { id: string; appointmentId: string; question:
 export type SymptomEntry = { id: string; symptom: string; severity: 'MILD' | 'MODERATE' | 'SEVERE'; occurredAt: string; notes?: string }
 export type CareTask = { id: string; taskDetailId: string; title: string; taskDate: string; completed: boolean; shared: boolean }
 export type PregnancyMilestone = { id: string; title: string; description?: string; weekNumber: number; type: 'STANDARD' | 'CUSTOM'; completed: boolean }
-export type DailyWellbeing = { date: string; waterGlasses: number; waterGoal: number; prenatalVitaminTaken: boolean; activityMinutes: number; activityGoal: number; mood?: string; sleepHours: number; sleepGoal: number }
+export type DailyWellbeing = { date: string; waterGlasses: number; waterGoal: number; prenatalVitaminTaken: boolean; activityMinutes: number; activityGoal: number; mood?: string; sleepHours: number; sleepGoal: number; energyLevel: 'LOW' | 'STEADY' | 'HIGH'; focusTaskCount: number }
+export type AiAssistantReply = { answer: string; source: 'LOCAL_OLLAMA' | 'LOCAL_MODEL_UNAVAILABLE' | 'SAFETY_GUIDANCE'; urgent: boolean; safetyNote: string }
+export type WeeklyGuideData = { week: number; trimester: string; title: string; summary: string; nutrition: string[]; activity: string[]; bodyChanges: string[]; questionsForClinician: string[]; contentVersion: string; reviewedOn: string }
+export type EducationResource = { id: string; category: string; title: string; description: string; content: string; keyPoints: string[]; reviewStatus: 'EDUCATIONAL_REVIEW'; contentVersion: string; reviewedOn: string }
+export type HealthcareReport = {
+  generatedAt: string
+  journalIncluded: boolean
+  person: { displayName: string; email: string }
+  pregnancy: { lastMenstrualPeriod: string; dueDate: string; currentWeek: number; trimester: string; ageYears: number; heightCm?: number; prePregnancyWeightKg?: number; bloodPressure?: string; bloodGroup?: string }
+  appointments: { title: string; startsAt: string; providerName?: string; clinicName?: string; notes?: string }[]
+  tracking: { from: string; to: string; totalTasks: number; completedTasks: number; completionPercentage: number; averageWaterGlasses: number; averageActivityMinutes: number; averageSleepHours: number; prenatalVitaminDays: number }
+  milestones: { title: string; weekNumber: number; completed: boolean }[]
+  journal: { symptom: string; severity: string; occurredAt: string; notes?: string }[]
+  disclaimer: string
+}
+export type ReportShare = { id: string; createdAt: string; expiresAt: string; journalIncluded: boolean; status: 'ACTIVE' | 'EXPIRED' | 'REVOKED'; accessCount: number; lastAccessedAt?: string }
+export type CreatedReportShare = { id: string; token: string; expiresAt: string; journalIncluded: boolean }
+export type LabValue = { testName: string; value: number; unit: string; referenceMin: number; referenceMax: number }
+export type LabResult = LabValue & { status: 'BELOW_RANGE' | 'WITHIN_RANGE' | 'ABOVE_RANGE'; nutrient?: string; foodSources: string[]; message: string }
+export type LabGuideResponse = { results: LabResult[]; aiSummary: string; aiSource: 'LOCAL_OLLAMA' | 'LOCAL_MODEL_UNAVAILABLE'; disclaimer: string }
 
 async function request<T>(path: string, options: RequestInit = {}, token?: string): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, { ...options, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...options.headers } })
@@ -44,6 +63,20 @@ export const updateSymptom = (token: string, id: string, payload: { symptom: str
 export const deleteSymptom = (token: string, id: string) => request<void>(`/symptoms/${id}`, { method: 'DELETE' }, token)
 export const getTaskHistory = (token: string, from: string, to: string) => request<CareTask[]>(`/tasks?from=${from}&to=${to}`, {}, token)
 export const getMilestones = (token: string) => request<PregnancyMilestone[]>('/pregnancy-milestones', {}, token)
+export const getWeeklyGuide = (token: string) => request<WeeklyGuideData>('/weekly-guide', {}, token)
+export const getResources = (token: string, category: string, query: string) => {
+  const parameters = new URLSearchParams()
+  if (category !== 'All') parameters.set('category', category)
+  if (query.trim()) parameters.set('q', query.trim())
+  const search = parameters.toString()
+  return request<EducationResource[]>(`/resources${search ? `?${search}` : ''}`, {}, token)
+}
+export const getHealthcareReport = (token: string, includeJournal: boolean) => request<HealthcareReport>(`/reports/pregnancy-summary?includeJournal=${includeJournal}`, {}, token)
+export const createReportShare = (token: string, includeJournal: boolean, expiresInHours: number) => request<CreatedReportShare>(`/reports/shares?includeJournal=${includeJournal}&expiresInHours=${expiresInHours}`, { method: 'POST' }, token)
+export const getReportShares = (token: string) => request<ReportShare[]>('/reports/shares', {}, token)
+export const revokeReportShare = (token: string, id: string) => request<void>(`/reports/shares/${id}`, { method: 'DELETE' }, token)
+export const getSharedReport = (shareToken: string) => request<HealthcareReport>(`/shared-reports/${encodeURIComponent(shareToken)}`)
+export const analyzeLabValues = (token: string, values: LabValue[], reportNotes: string) => request<LabGuideResponse>('/lab-guide/analyze', { method: 'POST', body: JSON.stringify({ values, reportNotes: reportNotes.trim() || undefined }) }, token)
 export const completeMilestone = (token: string, id: string, completed: boolean) => request<PregnancyMilestone>(`/pregnancy-milestones/${id}/complete`, { method: 'PATCH', body: JSON.stringify({ completed }) }, token)
 export const completeTask = (token: string, id: string, completed: boolean) => request<CareTask>(`/tasks/${id}/complete`, { method: 'PATCH', body: JSON.stringify({ completed }) }, token)
 export const createTask = (token: string, title: string, taskDate: string, recurrence: 'NONE' | 'DAILY' | 'WEEKLY') => request<CareTask>('/tasks', { method: 'POST', body: JSON.stringify({ title, taskDate, recurrence }) }, token)
@@ -55,6 +88,8 @@ export const updatePrenatalVitamin = (token: string, date: string, taken: boolea
 export const updateActivity = (token: string, date: string, minutes: number) => request<DailyWellbeing>('/wellbeing/activity', { method: 'PATCH', body: JSON.stringify({ date, minutes }) }, token)
 export const updateMood = (token: string, date: string, mood: string) => request<DailyWellbeing>('/wellbeing/mood', { method: 'PATCH', body: JSON.stringify({ date, mood }) }, token)
 export const updateSleep = (token: string, date: string, hours: number) => request<DailyWellbeing>('/wellbeing/sleep', { method: 'PATCH', body: JSON.stringify({ date, hours }) }, token)
+export const updateDayPlan = (token: string, date: string, energyLevel: DailyWellbeing['energyLevel'], focusTaskCount: number) => request<DailyWellbeing>('/wellbeing/day-plan', { method: 'PATCH', body: JSON.stringify({ date, energyLevel, focusTaskCount }) }, token)
+export const askAssistant = (token: string, question: string) => request<AiAssistantReply>('/assistant', { method: 'POST', body: JSON.stringify({ question }) }, token)
 export type AdminUser = { email: string; displayName: string; role: string }
 export const getAdminUsers = (token: string) => request<AdminUser[]>('/admin/users', {}, token)
 export const createAdminTask = (token: string, payload: { title: string; taskDate: string }) => request('/admin/tasks', { method: 'POST', body: JSON.stringify(payload) }, token)

@@ -1,57 +1,38 @@
-type WeeklyGuideProps = { currentWeek?: number; trimester?: string }
-
-const guideContent = [
-  {
-    id: 'first',
-    title: 'Early pregnancy care',
-    summary: 'Your body is adjusting to pregnancy, and rest can help you feel more steady.',
-    guidance: [
-      'Aim for regular meals and hydration, especially if nausea is affecting your appetite.',
-      'Keep prenatal vitamins consistent unless your clinician tells you otherwise.',
-      'Notice when you feel more tired than usual and build in rest breaks.'
-    ]
-  },
-  {
-    id: 'second',
-    title: 'Gentle movement and rhythm',
-    summary: 'Many people feel more energetic in the second trimester, which can be a good time to focus on routine.',
-    guidance: [
-      'Choose light movement you enjoy, such as walking or stretching, if your clinician agrees it is appropriate.',
-      'Keep an eye on hydration and sleep so your daily habits stay sustainable.',
-      'Use the journal to track patterns in mood, fatigue, or movement.'
-    ]
-  },
-  {
-    id: 'third',
-    title: 'Preparing for the final stretch',
-    summary: 'Later pregnancy often brings more changes in comfort, sleep, and energy, and it is okay to ask for support.',
-    guidance: [
-      'Plan rest, hydration, and practical support around your schedule as your body changes.',
-      'Review your birth and hospital plans with your care team when the time is right.',
-      'Keep tracking symptoms, sleep, and mood so you can share clear information with your clinician.'
-    ]
-  }
-]
-
 import { useState } from 'react'
+import type { WeeklyGuideData } from '../api'
+import { localeFor, translate } from '../i18n'
+import type { LanguageCode } from '../i18n'
 
-export function WeeklyGuide({ currentWeek = 24, trimester = 'Second trimester' }: WeeklyGuideProps) {
+type WeeklyGuideProps = { guide: WeeklyGuideData | null; language: LanguageCode }
+
+export function WeeklyGuide({ guide, language }: WeeklyGuideProps) {
   const [expanded, setExpanded] = useState(false)
-  const guide = guideContent[(currentWeek >= 28 ? 2 : currentWeek >= 14 ? 1 : 0)]
+
+  if (!guide) {
+    return <section className="panel insight-panel"><div className="insight-tag">{translate(language, 'guide.label')}</div><h2>{translate(language, 'guide.preparing')}</h2><p>{translate(language, 'guide.profile')}</p></section>
+  }
+
+  const sections = [
+    [translate(language, 'guide.nutrition'), guide.nutrition],
+    [translate(language, 'guide.activity'), guide.activity],
+    [translate(language, 'guide.body'), guide.bodyChanges],
+    [translate(language, 'guide.discuss'), guide.questionsForClinician]
+  ] as const
 
   return (
     <section className="panel insight-panel" id="resources">
       <div className="guide-art" aria-hidden="true"><span>✦</span><div>♥</div></div>
-      <div className="insight-tag">YOUR {trimester.toUpperCase()} GUIDE · WEEK {currentWeek}</div>
+      <div className="insight-tag">YOUR {guide.trimester.toUpperCase()} GUIDE · WEEK {guide.week}</div>
       <h2>{guide.title}</h2>
       <p>{guide.summary}</p>
       {expanded && (
-        <ul className="guide-points">
-          {guide.guidance.map((point) => <li key={point}>{point}</li>)}
-        </ul>
+        <div className="guide-sections">
+          {sections.map(([title, points]) => <section key={title}><h3>{title}</h3><ul className="guide-points">{points.map((point) => <li key={point}>{point}</li>)}</ul></section>)}
+          <small>v{guide.contentVersion} · {new Date(`${guide.reviewedOn}T00:00:00`).toLocaleDateString(localeFor(language))}</small>
+        </div>
       )}
       <button className="light-button" type="button" onClick={() => setExpanded((value) => !value)}>
-        {expanded ? 'Hide this week’s guide' : 'Read this week’s guide'} <span>{expanded ? '↑' : '→'}</span>
+        {translate(language, expanded ? 'guide.hide' : 'guide.read')} <span>{expanded ? '↑' : '→'}</span>
       </button>
     </section>
   )

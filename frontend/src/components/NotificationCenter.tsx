@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Baby, Bell, CalendarClock, History, ListChecks } from 'lucide-react'
 import type { Appointment, CareTask, PregnancySummary } from '../api'
+import { localeFor } from '../i18n'
+import type { LanguageCode } from '../i18n'
 
 type NotificationCenterProps = {
   appointments: Appointment[]
@@ -15,6 +17,7 @@ type NotificationCenterProps = {
   weeklyPregnancyReminderTime: string
   taskHistory: CareTask[]
   missedTaskRemindersEnabled: boolean
+  language: LanguageCode
 }
 
 type ReminderItem = {
@@ -26,11 +29,8 @@ type ReminderItem = {
   type: 'appointment' | 'care' | 'pregnancy' | 'missed'
 }
 
-const reminderTimeFormat = new Intl.DateTimeFormat('en-IN', {
-  day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit',
-})
-
-export function NotificationCenter({ appointments, tasks, appointmentRemindersEnabled, browserNotificationsEnabled, dailyCareRemindersEnabled, dailyCareReminderTime, pregnancy, weeklyPregnancyRemindersEnabled, weeklyPregnancyReminderDay, weeklyPregnancyReminderTime, taskHistory, missedTaskRemindersEnabled }: NotificationCenterProps) {
+export function NotificationCenter({ appointments, tasks, appointmentRemindersEnabled, browserNotificationsEnabled, dailyCareRemindersEnabled, dailyCareReminderTime, pregnancy, weeklyPregnancyRemindersEnabled, weeklyPregnancyReminderDay, weeklyPregnancyReminderTime, taskHistory, missedTaskRemindersEnabled, language }: NotificationCenterProps) {
+  const reminderTimeFormat = new Intl.DateTimeFormat(localeFor(language), { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })
   const [open, setOpen] = useState(false)
   const [now, setNow] = useState(() => Date.now())
   const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>(() =>

@@ -1,72 +1,53 @@
-import { useMemo, useState } from 'react'
+import { useDeferredValue, useEffect, useState } from 'react'
+import { BookOpen, X } from 'lucide-react'
+import { getResources } from '../api'
+import type { EducationResource } from '../api'
+import { translate } from '../i18n'
+import type { LanguageCode } from '../i18n'
 
-type Resource = {
-  title: string
-  category: 'Nutrition' | 'Exercise' | 'Wellbeing' | 'Emergency'
-  description: string
-  linkLabel: string
-}
+const categories = ['All', 'Nutrition', 'Exercise', 'Wellbeing', 'Postpartum', 'Newborn', 'Hospital', 'Emergency'] as const
 
-const resources: Resource[] = [
-  {
-    title: 'Healthy eating through pregnancy',
-    category: 'Nutrition',
-    description: 'Simple guidance on balanced meals, hydration, and nutrition basics.',
-    linkLabel: 'Learn more'
-  },
-  {
-    title: 'Gentle movement ideas',
-    category: 'Exercise',
-    description: 'Walking, stretching, and low-impact habits that may support daily wellbeing.',
-    linkLabel: 'View tips'
-  },
-  {
-    title: 'Mindful wellbeing routines',
-    category: 'Wellbeing',
-    description: 'Supportive ideas for rest, stress management, and emotional balance.',
-    linkLabel: 'Explore'
-  },
-  {
-    title: 'Hospital and emergency checklist',
-    category: 'Emergency',
-    description: 'Helpful preparation steps and when to contact your care team urgently.',
-    linkLabel: 'Review checklist'
-  }
-]
-
-const categories = ['All', 'Nutrition', 'Exercise', 'Wellbeing', 'Emergency'] as const
-
-export function ResourceLibraryCard() {
+export function ResourceLibraryCard({ language }: { language: LanguageCode }) {
   const [selectedCategory, setSelectedCategory] = useState<(typeof categories)[number]>('All')
   const [search, setSearch] = useState('')
+  const deferredSearch = useDeferredValue(search)
+  const [resources, setResources] = useState<EducationResource[]>([])
+  const [selectedResource, setSelectedResource] = useState<EducationResource | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  const visibleResources = useMemo(() => {
-    return resources.filter((resource) => {
-      const categoryMatch = selectedCategory === 'All' || resource.category === selectedCategory
-      const searchMatch = resource.title.toLowerCase().includes(search.toLowerCase()) || resource.description.toLowerCase().includes(search.toLowerCase())
-      return categoryMatch && searchMatch
-    })
-  }, [search, selectedCategory])
+  useEffect(() => {
+    const token = sessionStorage.getItem('maatricare-token')
+    if (!token) return
+    let active = true
+    setLoading(true)
+    setError('')
+    getResources(token, selectedCategory, deferredSearch)
+      .then((loadedResources) => { if (active) setResources(loadedResources) })
+      .catch(() => { if (active) setError('Resources could not be loaded. Please try again.') })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [deferredSearch, selectedCategory])
 
   return (
     <section className="panel resource-panel" id="resources-library">
       <div className="panel-heading">
         <div>
-          <p className="section-label">Resources</p>
-          <h2>Helpful guides</h2>
+          <p className="section-label">{translate(language, 'resources.label')}</p>
+          <h2>{translate(language, 'resources.title')}</h2>
         </div>
-        <span className="task-count">{visibleResources.length} {visibleResources.length === 1 ? 'topic' : 'topics'}</span>
+        <span className="task-count">{resources.length} {resources.length === 1 ? 'topic' : 'topics'}</span>
       </div>
 
-      <p className="panel-description">Supportive information to revisit as your pregnancy changes.</p>
+      <p className="panel-description">{translate(language, 'resources.description')}</p>
 
       <div className="resource-toolbar">
         <input
           type="search"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search resources"
-          aria-label="Search resources"
+          placeholder={translate(language, 'resources.search')}
+          aria-label={translate(language, 'resources.search')}
         />
         <div className="resource-filters" aria-label="Resource categories">
           {categories.map((category) => (
@@ -83,19 +64,36 @@ export function ResourceLibraryCard() {
       </div>
 
       <div className="resource-grid">
-        {visibleResources.length === 0 ? (
-          <div className="resource-empty">No matching resources found.</div>
+        {loading ? (
+          <div className="resource-empty">{translate(language, 'resources.loading')}</div>
+        ) : error ? (
+          <div className="resource-empty form-error" role="alert">{error}</div>
+        ) : resources.length === 0 ? (
+          <div className="resource-empty">{translate(language, 'resources.empty')}</div>
         ) : (
-          visibleResources.map((resource) => (
-            <article className="resource-item" key={resource.title}>
+          resources.map((resource) => (
+            <article className="resource-item" key={resource.id}>
               <span className="resource-category">{resource.category}</span>
               <strong>{resource.title}</strong>
               <p>{resource.description}</p>
-              <button type="button">{resource.linkLabel} <span>→</span></button>
+              <small className="resource-review">Educational review · v{resource.contentVersion}</small>
+              <button type="button" onClick={() => setSelectedResource(resource)}>{translate(language, 'resources.open')} <span>→</span></button>
             </article>
           ))
         )}
       </div>
+      {selectedResource && (
+        <div className="confirm-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedResource(null) }}>
+          <section className="resource-dialog" role="dialog" aria-modal="true" aria-labelledby="resource-dialog-title">
+            <header><span className="resource-dialog-icon" aria-hidden="true"><BookOpen /></span><button type="button" aria-label="Close resource" onClick={() => setSelectedResource(null)}><X /></button></header>
+            <p className="section-label">{selectedResource.category} · Educational content</p>
+            <h2 id="resource-dialog-title">{selectedResource.title}</h2>
+            <p className="resource-dialog-content">{selectedResource.content}</p>
+            <ul>{selectedResource.keyPoints.map((point) => <li key={point}>{point}</li>)}</ul>
+            <footer><span>Version {selectedResource.contentVersion} · Reviewed {new Date(`${selectedResource.reviewedOn}T00:00:00`).toLocaleDateString()}</span><strong>General education only. Discuss personal care decisions with your healthcare professional.</strong></footer>
+          </section>
+        </div>
+      )}
     </section>
   )
 }

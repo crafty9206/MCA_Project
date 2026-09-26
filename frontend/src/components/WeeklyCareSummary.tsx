@@ -1,10 +1,12 @@
 import type { CareTask } from '../api'
+import { localeFor } from '../i18n'
+import { translate } from '../i18n'
+import type { LanguageCode } from '../i18n'
 
-type WeeklyCareSummaryProps = { history: CareTask[]; todayTasks: CareTask[] }
+type WeeklyCareSummaryProps = { history: CareTask[]; todayTasks: CareTask[]; language: LanguageCode }
 
-const dateFormat = new Intl.DateTimeFormat('en-IN', { weekday: 'short' })
-
-export function WeeklyCareSummary({ history, todayTasks }: WeeklyCareSummaryProps) {
+export function WeeklyCareSummary({ history, todayTasks, language }: WeeklyCareSummaryProps) {
+  const dateFormat = new Intl.DateTimeFormat(localeFor(language), { weekday: 'short' })
   const allTasks = [...history, ...todayTasks]
   const grouped = allTasks.reduce<Record<string, CareTask[]>>((days, task) => {
     (days[task.taskDate] ??= []).push(task)
@@ -17,9 +19,9 @@ export function WeeklyCareSummary({ history, todayTasks }: WeeklyCareSummaryProp
 
   return (
     <section className="panel weekly-summary-panel">
-      <div className="panel-heading"><div><p className="section-label">Your week in care</p><h2>Weekly care summary</h2></div><span className="summary-score">{percentage}%</span></div>
-      <p className="summary-intro">{total ? `${completed} of ${total} care tasks completed across the recorded week.` : 'Complete a care task to start your weekly summary.'}</p>
-      <div className="summary-bars">{days.length === 0 ? <p className="panel-description">No care history recorded yet.</p> : days.map(([date, dayTasks]) => { const dayCompleted = dayTasks.filter((task) => task.completed).length; const dayProgress = Math.round((dayCompleted / dayTasks.length) * 100); return <div className="summary-day" key={date}><span>{dateFormat.format(new Date(`${date}T00:00:00`))}</span><div className="summary-bar"><i style={{ width: `${dayProgress}%` }} /></div><b>{dayCompleted}/{dayTasks.length}</b></div> })}</div>
+      <div className="panel-heading"><div><p className="section-label">{translate(language, 'weekly.label')}</p><h2>{translate(language, 'weekly.title')}</h2></div><span className="summary-score">{percentage}%</span></div>
+      <p className="summary-intro">{total ? translate(language, 'weekly.progress', { completed, total }) : translate(language, 'weekly.start')}</p>
+      <div className="summary-bars">{days.length === 0 ? <p className="panel-description">{translate(language, 'weekly.empty')}</p> : days.map(([date, dayTasks]) => { const dayCompleted = dayTasks.filter((task) => task.completed).length; const dayProgress = Math.round((dayCompleted / dayTasks.length) * 100); return <div className="summary-day" key={date}><span>{dateFormat.format(new Date(`${date}T00:00:00`))}</span><div className="summary-bar"><i style={{ width: `${dayProgress}%` }} /></div><b>{dayCompleted}/{dayTasks.length}</b></div> })}</div>
     </section>
   )
 }

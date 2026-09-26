@@ -3,17 +3,22 @@ package com.maatricare.tracking;
 import java.time.LocalDate;
 import java.math.BigDecimal;
 import java.util.UUID;
+import java.util.ArrayList;
+import java.util.List;
 
 import com.maatricare.user.User;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OrderColumn;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 
@@ -47,6 +52,18 @@ public class DailyWellbeing {
     @Column(name = "sleep_hours", precision = 3, scale = 1, nullable = false)
     private BigDecimal sleepHours = BigDecimal.ZERO;
 
+    @Column(name = "energy_level", nullable = false, length = 16)
+    private String energyLevel = "STEADY";
+
+    @Column(name = "focus_task_count", nullable = false)
+    private int focusTaskCount = 3;
+
+    @ElementCollection
+    @CollectionTable(name = "daily_wellbeing_focus_tasks", joinColumns = @JoinColumn(name = "daily_wellbeing_id"))
+    @Column(name = "task_id", nullable = false)
+    @OrderColumn(name = "sort_order")
+    private List<UUID> focusTaskIds = new ArrayList<>();
+
     protected DailyWellbeing() {
     }
 
@@ -67,4 +84,13 @@ public class DailyWellbeing {
     public void setMood(String mood) { this.mood = mood; }
     public BigDecimal getSleepHours() { return sleepHours; }
     public void setSleepHours(BigDecimal sleepHours) { this.sleepHours = sleepHours; }
+    public String getEnergyLevel() { return energyLevel; }
+    public int getFocusTaskCount() { return focusTaskCount; }
+    public List<UUID> getFocusTaskIds() { return List.copyOf(focusTaskIds); }
+    public void updateDayPlan(String energyLevel, int focusTaskCount, List<UUID> focusTaskIds) {
+        this.energyLevel = energyLevel;
+        this.focusTaskCount = focusTaskCount;
+        this.focusTaskIds.clear();
+        this.focusTaskIds.addAll(focusTaskIds);
+    }
 }

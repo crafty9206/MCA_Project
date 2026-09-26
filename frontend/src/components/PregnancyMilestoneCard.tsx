@@ -1,13 +1,16 @@
 import { useMemo, useState } from 'react'
 import { Check } from 'lucide-react'
 import type { PregnancyMilestone } from '../api'
+import { translate } from '../i18n'
+import type { LanguageCode } from '../i18n'
 
 type Props = {
   milestones: PregnancyMilestone[]
   onRefresh: () => Promise<void>
+  language: LanguageCode
 }
 
-export function PregnancyMilestoneCard({ milestones, onRefresh }: Props) {
+export function PregnancyMilestoneCard({ milestones, onRefresh, language }: Props) {
   const [expanded, setExpanded] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [togglingId, setTogglingId] = useState<string | null>(null)
@@ -33,13 +36,13 @@ export function PregnancyMilestoneCard({ milestones, onRefresh }: Props) {
     <section className="panel milestone-panel">
       <div className="panel-heading">
         <div>
-          <p className="section-label">Pregnancy journey</p>
-          <h2>Milestones</h2>
+          <p className="section-label">{translate(language, 'milestone.label')}</p>
+          <h2>{translate(language, 'milestone.title')}</h2>
         </div>
-        <span className="task-count">{completedCount}/{visibleMilestones.length} done</span>
+        <span className="task-count">{completedCount}/{visibleMilestones.length} {translate(language, 'milestone.done')}</span>
       </div>
 
-      <p className="panel-description">Your pregnancy timeline keeps key milestones together in one place.</p>
+      <p className="panel-description">{translate(language, 'milestone.description')}</p>
 
       <div className="milestone-summary">
         <strong>{activeMilestones[0]?.weekNumber ?? visibleMilestones[0]?.weekNumber ?? 0}w</strong>
@@ -47,7 +50,7 @@ export function PregnancyMilestoneCard({ milestones, onRefresh }: Props) {
       </div>
 
       <button className="text-button" type="button" onClick={() => setShowForm((value) => !value)}>
-        {showForm ? 'Close custom milestone' : 'Add custom milestone'} <span>{showForm ? '↑' : '→'}</span>
+        {translate(language, showForm ? 'milestone.close' : 'milestone.add')} <span>{showForm ? '↑' : '→'}</span>
       </button>
 
       {showForm && (
@@ -105,7 +108,7 @@ export function PregnancyMilestoneCard({ milestones, onRefresh }: Props) {
                 <span className="milestone-check">{milestone.completed ? <Check size={14} /> : '○'}</span>
                 <span className="milestone-copy">
                   <strong>{milestone.title}</strong>
-                  <small>{milestone.weekNumber} weeks</small>
+                  <small>{milestone.weekNumber} {translate(language, 'milestone.weeks')}</small>
                   {milestone.description && <em>{milestone.description}</em>}
                 </span>
                 <span className="milestone-type">{milestone.type}</span>
@@ -117,7 +120,7 @@ export function PregnancyMilestoneCard({ milestones, onRefresh }: Props) {
 
       {visibleMilestones.length > 4 && (
         <button className="text-button" type="button" onClick={() => setExpanded((value) => !value)}>
-          {expanded ? 'Show fewer' : 'View all milestones'} <span>{expanded ? '↑' : '→'}</span>
+          {translate(language, expanded ? 'milestone.less' : 'milestone.more')} <span>{expanded ? '↑' : '→'}</span>
         </button>
       )}
     </section>

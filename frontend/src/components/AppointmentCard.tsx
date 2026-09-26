@@ -2,16 +2,18 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { createAppointment, createAppointmentQuestion, deleteAppointment, deleteAppointmentQuestion, getAppointmentQuestions, updateAppointment, updateAppointmentQuestion } from '../api'
 import type { Appointment, AppointmentQuestion } from '../api'
+import { localeFor } from '../i18n'
+import { translate } from '../i18n'
+import type { LanguageCode } from '../i18n'
 
 type AppointmentCardProps = {
   appointments: Appointment[]
   onCreated: (appointment: Appointment) => void
   onUpdated: (appointment: Appointment) => void
   onDeleted: (id: string) => void
+  language: LanguageCode
 }
 
-const dateFormat = new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short' })
-const timeFormat = new Intl.DateTimeFormat('en-IN', { hour: 'numeric', minute: '2-digit' })
 const reminderLabels: Record<number, string> = { 30: '30 minutes before', 60: '1 hour before', 1440: '1 day before', 2880: '2 days before', 10080: '1 week before' }
 
 const localDateTimeValue = (value?: string) => {
@@ -21,7 +23,10 @@ const localDateTimeValue = (value?: string) => {
   return new Date(date.getTime() - offset).toISOString().slice(0, 16)
 }
 
-export function AppointmentCard({ appointments, onCreated, onUpdated, onDeleted }: AppointmentCardProps) {
+export function AppointmentCard({ appointments, onCreated, onUpdated, onDeleted, language }: AppointmentCardProps) {
+  const locale = localeFor(language)
+  const dateFormat = new Intl.DateTimeFormat(locale, { day: '2-digit', month: 'short' })
+  const timeFormat = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' })
   const [showForm, setShowForm] = useState(false)
   const [showSchedule, setShowSchedule] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -156,17 +161,17 @@ export function AppointmentCard({ appointments, onCreated, onUpdated, onDeleted 
   return (
     <section className="panel appointment-panel">
       <div className="panel-heading">
-        <div><p className="section-label">Coming up</p><h2>Next appointment</h2></div>
+        <div><p className="section-label">{translate(language, 'appointment.label')}</p><h2>{translate(language, 'appointment.title')}</h2></div>
         {appointments.length > 0 && <button className="more-button" type="button" aria-label="View appointment schedule" onClick={() => setShowSchedule((visible) => !visible)}>•••</button>}
       </div>
 
-      {appointment && start ? <div className="appointment-detail"><div className="date-block"><b>{start.getDate()}</b><span>{dateFormat.format(start).split(' ')[1]}</span></div><div><strong>{appointment.title}</strong><span>{start.toLocaleDateString('en-IN', { weekday: 'long' })} · {timeFormat.format(start)}{end ? ` – ${timeFormat.format(end)}` : ''}</span><span>{[appointment.providerName, appointment.clinicName].filter(Boolean).join(' · ') || 'Details not provided'}</span>{appointment.reminderMinutesBefore != null && <span className="reminder-label">◇ Reminder {reminderLabels[appointment.reminderMinutesBefore] ?? `${appointment.reminderMinutesBefore} minutes before`}</span>}</div></div> : <p className="panel-description">No upcoming appointments yet. Add one when your next visit is scheduled.</p>}
+      {appointment && start ? <div className="appointment-detail"><div className="date-block"><b>{start.getDate()}</b><span>{dateFormat.format(start).split(' ')[1]}</span></div><div><strong>{appointment.title}</strong><span>{start.toLocaleDateString(locale, { weekday: 'long' })} · {timeFormat.format(start)}{end ? ` – ${timeFormat.format(end)}` : ''}</span><span>{[appointment.providerName, appointment.clinicName].filter(Boolean).join(' · ') || '—'}</span>{appointment.reminderMinutesBefore != null && <span className="reminder-label">◇ {reminderLabels[appointment.reminderMinutesBefore] ?? appointment.reminderMinutesBefore}</span>}</div></div> : <p className="panel-description">{translate(language, 'appointment.empty')}</p>}
 
       {appointment && <div className="appointment-actions"><button className="primary-button" type="button" onClick={openQuestions}>Prepare questions <span>→</span></button><button className="outline-button" type="button" onClick={() => edit(appointment)}>Edit</button><button className="icon-danger-button" type="button" aria-label="Delete appointment" title="Delete appointment" onClick={() => setDeletingId(appointment.id)}>×</button></div>}
 
       {showSchedule && <div className="appointment-schedule">{appointments.map((item) => <button type="button" key={item.id} onClick={() => edit(item)}><span>{dateFormat.format(new Date(item.startsAt))}</span><strong>{item.title}</strong><small>{timeFormat.format(new Date(item.startsAt))} · {[item.providerName, item.clinicName].filter(Boolean).join(' · ') || 'No provider details'}{item.reminderMinutesBefore != null ? ` · Reminder ${reminderLabels[item.reminderMinutesBefore] ?? `${item.reminderMinutesBefore} min before`}` : ''}</small></button>)}</div>}
 
-      <button className="text-button" type="button" onClick={() => showForm ? closeForm() : setShowForm(true)}>{showForm ? 'Close form' : 'Add your appointment'} <span>{showForm ? '↑' : '→'}</span></button>
+      <button className="text-button" type="button" onClick={() => showForm ? closeForm() : setShowForm(true)}>{translate(language, showForm ? 'appointment.close' : 'appointment.add')} <span>{showForm ? '↑' : '→'}</span></button>
 
       {showForm && <form className="appointment-form" onSubmit={submit}><label>Appointment title<input required maxLength={160} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Mid-pregnancy checkup" /></label><div className="form-row"><label>Start time<input required type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} /></label><label>End time <span className="optional">Optional</span><input type="datetime-local" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} /></label></div><label>Provider <span className="optional">Optional</span><input maxLength={160} value={providerName} onChange={(event) => setProviderName(event.target.value)} placeholder="Dr. Meera Shah" /></label><label>Clinic <span className="optional">Optional</span><input maxLength={200} value={clinicName} onChange={(event) => setClinicName(event.target.value)} placeholder="Sunrise Women's Clinic" /></label><label>Reminder <span className="optional">Optional</span><select value={reminderMinutesBefore} onChange={(event) => setReminderMinutesBefore(event.target.value)}><option value="">No reminder</option><option value="30">30 minutes before</option><option value="60">1 hour before</option><option value="1440">1 day before</option><option value="2880">2 days before</option><option value="10080">1 week before</option></select></label><label>Notes <span className="optional">Optional</span><textarea maxLength={1000} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Questions or preparation notes" /></label>{error && <p className="form-error">{error}</p>}<button className="primary-button" disabled={saving} type="submit">{saving ? 'Saving…' : editingId ? 'Update appointment' : 'Save appointment'} <span>→</span></button></form>}
 

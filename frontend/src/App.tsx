@@ -4,8 +4,8 @@ import { AuthFlow } from './components/AuthFlow'
 import { LandingPage } from './components/LandingPage'
 import { AdminPanel } from './components/AdminPanel'
 import { ProfileSettings } from './components/ProfileSettings'
-import { completeTask, deleteAccount, getAppointments, getMilestones, getProfile, getSymptoms, getTaskHistory, getTasks, getWellbeing, logout, updateActivity, updateMood, updatePrenatalVitamin, updateSleep, updateWater } from './api'
-import type { Appointment, CareTask, DailyWellbeing, DashboardProfile, PregnancyMilestone, SymptomEntry } from './api'
+import { completeTask, deleteAccount, getAppointments, getMilestones, getProfile, getSymptoms, getTaskHistory, getTasks, getWeeklyGuide, getWellbeing, logout, updateActivity, updateDayPlan, updateMood, updatePrenatalVitamin, updateSleep, updateWater } from './api'
+import type { Appointment, CareTask, DailyWellbeing, DashboardProfile, PregnancyMilestone, SymptomEntry, WeeklyGuideData } from './api'
 import { CareChecklist } from './components/CareChecklist'
 import { ExerciseCard } from './components/ExerciseCard'
 import { HydrationCard } from './components/HydrationCard'
@@ -21,9 +21,17 @@ import { Topbar } from './components/Topbar'
 import { WeeklyGuide } from './components/WeeklyGuide'
 import { WelcomeSection } from './components/WelcomeSection'
 import { ResourceLibraryCard } from './components/ResourceLibraryCard'
+import { AiAssistantCard } from './components/AiAssistantCard'
+import { HealthcareReport } from './components/HealthcareReport'
+import { SharedReportPage } from './components/SharedReportPage'
+import { LabReportGuide } from './components/LabReportGuide'
+import { GentleDayPlanner } from './components/GentleDayPlanner'
+import { translate } from './i18n'
+import type { LanguageCode } from './i18n'
 import './App.css'
 
 function App() {
+  const sharedReportToken = new URLSearchParams(window.location.search).get('share')
   const [profile, setProfile] = useState<DashboardProfile | null>(null)
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [tasks, setTasks] = useState<CareTask[]>([])
@@ -31,6 +39,7 @@ function App() {
   const [symptoms, setSymptoms] = useState<SymptomEntry[]>([])
   const [milestones, setMilestones] = useState<PregnancyMilestone[]>([])
   const [wellbeing, setWellbeing] = useState<DailyWellbeing | null>(null)
+  const [weeklyGuide, setWeeklyGuide] = useState<WeeklyGuideData | null>(null)
   const [savingWater, setSavingWater] = useState(false)
   const [dashboardError, setDashboardError] = useState('')
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false)
@@ -38,7 +47,7 @@ function App() {
   const [deletingAccount, setDeletingAccount] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [language, setLanguage] = useState('English')
+  const language: LanguageCode = 'en'
   const [activeNav, setActiveNav] = useState('Overview')
   const [authScreen, setAuthScreen] = useState<'landing' | 'signup' | 'signin'>(() => {
     const savedScreen = sessionStorage.getItem('maatricare-auth-screen')
@@ -169,6 +178,16 @@ function App() {
     catch { setWellbeing(previous); setDashboardError('Your sleep record could not be saved.') }
   }
 
+  const saveDayPlan = async (energyLevel: DailyWellbeing['energyLevel'], focusTaskCount: number) => {
+    const token = sessionStorage.getItem('maatricare-token')
+    if (!token || !wellbeing) return
+    try { setWellbeing(await updateDayPlan(token, wellbeing.date, energyLevel, focusTaskCount)) }
+    catch {
+      setDashboardError('Your gentle day plan could not be saved.')
+      throw new Error('Unable to save gentle day plan')
+    }
+  }
+
   const loadTrackingData = async (token: string) => {
     const todayDate = new Date()
     const historyStartDate = new Date(todayDate)
@@ -212,6 +231,16 @@ function App() {
     }).catch(() => sessionStorage.removeItem('maatricare-token')).finally(() => setLoading(false))
   }, [])
 
+  useEffect(() => {
+    const token = sessionStorage.getItem('maatricare-token')
+    if (!token || !profile?.pregnancy) {
+      setWeeklyGuide(null)
+      return
+    }
+    getWeeklyGuide(token).then(setWeeklyGuide).catch(() => setWeeklyGuide(null))
+  }, [profile?.pregnancy])
+
+  if (sharedReportToken) return <SharedReportPage token={sharedReportToken} />
   if (loading) return <main className="loading-page">Loading your care plan…</main>
   if (isAdmin) return <AdminPanel onLogout={handleLogout} />
   if (!profile) {
@@ -219,30 +248,85 @@ function App() {
     return <AuthFlow initialScreen={authScreen} onComplete={completeAuthentication} onAdmin={() => setIsAdmin(true)} />
   }
 
+  const pageHeading = (label: string, title: string, description: string) => (
+    <header className="feature-page-heading">
+      <p className="eyebrow">{label}</p>
+      <h1>{title}</h1>
+      <p>{description}</p>
+    </header>
+  )
+
+  const activePage = (() => {
+    switch (activeNav) {
+      case 'Daily Care':
+        return <div className="content feature-page" id="daily-care">
+          {pageHeading(translate(language, 'page.daily.label'), translate(language, 'page.daily.title'), translate(language, 'page.daily.description'))}
+          <div className="dashboard-grid">
+            <GentleDayPlanner tasks={tasks} wellbeing={wellbeing} onSave={saveDayPlan} onToggle={toggleTask} />
+            <CareChecklist tasks={tasks} history={taskHistory} onToggle={toggleTask} onCreated={addCustomTask} onUpdated={updateCustomTask} onDeleted={deleteCustomTask} language={language} />
+            <HydrationCard wellbeing={wellbeing} onChange={changeWater} disabled={savingWater} language={language} />
+            <PrenatalVitaminCard wellbeing={wellbeing} onChange={changeVitamin} language={language} />
+            <ActivityCard wellbeing={wellbeing} onChange={changeActivity} language={language} />
+            <SleepCard wellbeing={wellbeing} onChange={changeSleep} language={language} />
+            <ExerciseCard language={language} />
+          </div>
+        </div>
+      case 'Appointments':
+        return <div className="content feature-page" id="appointments">
+          {pageHeading(translate(language, 'page.appointments.label'), translate(language, 'page.appointments.title'), translate(language, 'page.appointments.description'))}
+          <div className="feature-single-column"><AppointmentCard appointments={appointments} onCreated={addAppointment} onUpdated={updateAppointmentInList} onDeleted={deleteAppointmentFromList} language={language} /></div>
+        </div>
+      case 'Journal':
+        return <div className="content feature-page" id="journal">
+          {pageHeading(translate(language, 'page.journal.label'), translate(language, 'page.journal.title'), translate(language, 'page.journal.description'))}
+          <div className="feature-single-column"><JournalCard selected={wellbeing?.mood ?? null} onSelect={changeMood} entries={symptoms} onCreated={(entry) => setSymptoms((current) => [entry, ...current])} onUpdated={(entry) => setSymptoms((current) => current.map((item) => item.id === entry.id ? entry : item))} onDeleted={(id) => setSymptoms((current) => current.filter((item) => item.id !== id))} language={language} /></div>
+        </div>
+      case 'Guides':
+        return <div className="content feature-page" id="guides">
+          {pageHeading(translate(language, 'page.guides.label'), translate(language, 'page.guides.title'), translate(language, 'page.guides.description'))}
+          <div className="dashboard-grid">
+            <PregnancyMilestoneCard milestones={milestones} language={language} onRefresh={async () => { const token = sessionStorage.getItem('maatricare-token'); if (token) setMilestones(await getMilestones(token)) }} />
+            <WeeklyGuide guide={weeklyGuide} language={language} />
+          </div>
+        </div>
+      case 'Resources':
+        return <div className="content feature-page" id="resources">
+          {pageHeading(translate(language, 'page.resources.label'), translate(language, 'page.resources.title'), translate(language, 'page.resources.description'))}
+          <ResourceLibraryCard language={language} />
+        </div>
+      case 'Reports':
+        return <div className="content feature-page" id="reports">
+          {pageHeading(translate(language, 'page.reports.label'), translate(language, 'page.reports.title'), translate(language, 'page.reports.description'))}
+          <HealthcareReport language={language} />
+        </div>
+      case 'AI Assistant':
+        return <div className="content assistant-page" id="ai-assistant">
+          <header className="assistant-page-heading">
+            <p className="eyebrow">{translate(language, 'page.ai.label')}</p>
+            <h1>{translate(language, 'page.ai.title')}</h1>
+            <p>{translate(language, 'page.ai.description')}</p>
+          </header>
+          <AiAssistantCard language={language} />
+        </div>
+      default:
+        return <div className="content feature-page" id="overview">
+          <WelcomeSection name={profile.displayName} language={language} />
+          {profile.pregnancy && <PregnancyStatus pregnancy={profile.pregnancy} language={language} />}
+          <div className="dashboard-grid overview-summary-grid">
+            <DailyCompletionCard tasks={tasks} wellbeing={wellbeing} language={language} />
+            <WeeklyCareSummary history={taskHistory} todayTasks={tasks} language={language} />
+          </div>
+          <LabReportGuide />
+        </div>
+    }
+  })()
+
   return (
     <main className="app-shell">
-      <Topbar language={language} onLanguageChange={setLanguage} activeNav={activeNav} onNavigate={setActiveNav} onLogout={handleLogout} onDeleteAccount={() => setShowDeleteConfirmation(true)} onOpenSettings={() => setShowProfileSettings(true)} displayName={profile.displayName} appointments={appointments} appointmentRemindersEnabled={profile.appointmentRemindersEnabled} browserNotificationsEnabled={profile.browserNotificationsEnabled} tasks={tasks} dailyCareRemindersEnabled={profile.dailyCareRemindersEnabled} dailyCareReminderTime={profile.dailyCareReminderTime} pregnancy={profile.pregnancy} weeklyPregnancyRemindersEnabled={profile.weeklyPregnancyRemindersEnabled} weeklyPregnancyReminderDay={profile.weeklyPregnancyReminderDay} weeklyPregnancyReminderTime={profile.weeklyPregnancyReminderTime} taskHistory={taskHistory} missedTaskRemindersEnabled={profile.missedTaskRemindersEnabled} />
-      <div className="content" id="overview">
-        <WelcomeSection name={profile.displayName} />
-        {profile.pregnancy && <PregnancyStatus pregnancy={profile.pregnancy} />}
-        <div className="dashboard-grid">
-          <CareChecklist tasks={tasks} history={taskHistory} onToggle={toggleTask} onCreated={addCustomTask} onUpdated={updateCustomTask} onDeleted={deleteCustomTask} />
-          <AppointmentCard appointments={appointments} onCreated={addAppointment} onUpdated={updateAppointmentInList} onDeleted={deleteAppointmentFromList} />
-          <PregnancyMilestoneCard milestones={milestones} onRefresh={async () => { const token = sessionStorage.getItem('maatricare-token'); if (token) setMilestones(await getMilestones(token)) }} />
-          <JournalCard selected={wellbeing?.mood ?? null} onSelect={changeMood} entries={symptoms} onCreated={(entry) => setSymptoms((current) => [entry, ...current])} onUpdated={(entry) => setSymptoms((current) => current.map((item) => item.id === entry.id ? entry : item))} onDeleted={(id) => setSymptoms((current) => current.filter((item) => item.id !== id))} />
-          <HydrationCard wellbeing={wellbeing} onChange={changeWater} disabled={savingWater} />
-          <PrenatalVitaminCard wellbeing={wellbeing} onChange={changeVitamin} />
-          <ActivityCard wellbeing={wellbeing} onChange={changeActivity} />
-          <SleepCard wellbeing={wellbeing} onChange={changeSleep} />
-          <DailyCompletionCard tasks={tasks} wellbeing={wellbeing} />
-          <WeeklyCareSummary history={taskHistory} todayTasks={tasks} />
-          <ExerciseCard />
-          <WeeklyGuide currentWeek={profile.pregnancy?.currentWeek ?? 24} trimester={profile.pregnancy?.trimester ?? 'Second trimester'} />
-          <ResourceLibraryCard />
-        </div>
-        {dashboardError && <p className="dashboard-error" role="alert">{dashboardError}</p>}
-        <p className="disclaimer">MaatriCare provides organization and educational support. It does not provide medical diagnosis or replace advice from your healthcare professional.</p>
-      </div>
+      <Topbar activeNav={activeNav} onNavigate={setActiveNav} onLogout={handleLogout} onDeleteAccount={() => setShowDeleteConfirmation(true)} onOpenSettings={() => setShowProfileSettings(true)} displayName={profile.displayName} appointments={appointments} appointmentRemindersEnabled={profile.appointmentRemindersEnabled} browserNotificationsEnabled={profile.browserNotificationsEnabled} tasks={tasks} dailyCareRemindersEnabled={profile.dailyCareRemindersEnabled} dailyCareReminderTime={profile.dailyCareReminderTime} pregnancy={profile.pregnancy} weeklyPregnancyRemindersEnabled={profile.weeklyPregnancyRemindersEnabled} weeklyPregnancyReminderDay={profile.weeklyPregnancyReminderDay} weeklyPregnancyReminderTime={profile.weeklyPregnancyReminderTime} taskHistory={taskHistory} missedTaskRemindersEnabled={profile.missedTaskRemindersEnabled} />
+      {activePage}
+      {dashboardError && <p className="dashboard-error" role="alert">{dashboardError}</p>}
+      <p className="disclaimer">{translate(language, 'disclaimer')}</p>
       {showDeleteConfirmation && <div className="confirm-overlay" role="presentation"><section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-account-title"><p className="section-label">Permanent action</p><h2 id="delete-account-title">Delete your account?</h2><p>This permanently removes your pregnancy profile, appointments, care-task history, and account information. This cannot be undone.</p><div className="confirm-actions"><button className="outline-button" type="button" disabled={deletingAccount} onClick={() => setShowDeleteConfirmation(false)}>Cancel</button><button className="danger-button" type="button" disabled={deletingAccount} onClick={handleDeleteAccount}>{deletingAccount ? 'Deleting…' : 'Delete account'}</button></div></section></div>}
       {showProfileSettings && <ProfileSettings profile={profile} onClose={() => setShowProfileSettings(false)} onSaved={(updatedProfile) => { setProfile(updatedProfile); setShowProfileSettings(false) }} />}
     </main>

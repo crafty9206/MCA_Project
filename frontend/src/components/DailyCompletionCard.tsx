@@ -1,10 +1,12 @@
 import { CheckCircle2 } from 'lucide-react'
 import type { CSSProperties } from 'react'
 import type { CareTask, DailyWellbeing } from '../api'
+import { translate } from '../i18n'
+import type { LanguageCode } from '../i18n'
 
-type DailyCompletionCardProps = { tasks: CareTask[]; wellbeing: DailyWellbeing | null }
+type DailyCompletionCardProps = { tasks: CareTask[]; wellbeing: DailyWellbeing | null; language: LanguageCode }
 
-export function DailyCompletionCard({ tasks, wellbeing }: DailyCompletionCardProps) {
+export function DailyCompletionCard({ tasks, wellbeing, language }: DailyCompletionCardProps) {
   const taskScore = tasks.length === 0 ? 0 : (tasks.filter((task) => task.completed).length / tasks.length) * 100
   const waterScore = Math.min(100, ((wellbeing?.waterGlasses ?? 0) / (wellbeing?.waterGoal ?? 8)) * 100)
   const vitaminScore = wellbeing?.prenatalVitaminTaken ? 100 : 0
@@ -14,9 +16,9 @@ export function DailyCompletionCard({ tasks, wellbeing }: DailyCompletionCardPro
 
   return (
     <section className="panel completion-panel">
-      <div className="panel-heading"><div><p className="section-label">Today at a glance</p><h2>Daily completion</h2></div><span className="completion-icon"><CheckCircle2 aria-hidden="true" /></span></div>
-      <div className="completion-main"><div className="completion-ring" style={{ '--completion-progress': `${completion * 3.6}deg` } as CSSProperties}><strong>{completion}%</strong><span>complete</span></div><p>{completion >= 80 ? 'A strong day of caring for yourself.' : completion >= 40 ? 'You are building a thoughtful rhythm.' : 'Every small step still counts today.'}</p></div>
-      <div className="completion-breakdown"><span>Tasks <b>{Math.round(taskScore)}%</b></span><span>Water <b>{Math.round(waterScore)}%</b></span><span>Vitamins <b>{Math.round(vitaminScore)}%</b></span><span>Movement <b>{Math.round(activityScore)}%</b></span><span>Sleep <b>{Math.round(sleepScore)}%</b></span></div>
+      <div className="panel-heading"><div><p className="section-label">{translate(language, 'completion.label')}</p><h2>{translate(language, 'completion.title')}</h2></div><span className="completion-icon"><CheckCircle2 aria-hidden="true" /></span></div>
+      <div className="completion-main"><div className="completion-ring" style={{ '--completion-progress': `${completion * 3.6}deg` } as CSSProperties}><strong>{completion}%</strong><span>{translate(language, 'completion.complete')}</span></div><p>{translate(language, completion >= 80 ? 'completion.high' : completion >= 40 ? 'completion.medium' : 'completion.low')}</p></div>
+      <div className="completion-breakdown"><span>{translate(language, 'metric.tasks')} <b>{Math.round(taskScore)}%</b></span><span>{translate(language, 'metric.water')} <b>{Math.round(waterScore)}%</b></span><span>{translate(language, 'metric.vitamins')} <b>{Math.round(vitaminScore)}%</b></span><span>{translate(language, 'metric.movement')} <b>{Math.round(activityScore)}%</b></span><span>{translate(language, 'metric.sleep')} <b>{Math.round(sleepScore)}%</b></span></div>
     </section>
   )
 }
