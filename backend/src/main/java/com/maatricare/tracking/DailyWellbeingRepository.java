@@ -5,9 +5,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface DailyWellbeingRepository extends JpaRepository<DailyWellbeing, UUID> {
+    @EntityGraph(attributePaths = "focusTaskIds")
     Optional<DailyWellbeing> findByUserIdAndEntryDate(UUID userId, LocalDate entryDate);
     List<DailyWellbeing> findByUserIdAndEntryDateBetweenOrderByEntryDateAsc(UUID userId, LocalDate from, LocalDate to);
     void deleteByUserId(UUID userId);

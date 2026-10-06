@@ -258,7 +258,7 @@ AI features require a separate safety and privacy decision before implementation
 - [ ] Add accessibility checks
 - [ ] Add end-to-end registration test
 - [ ] Add end-to-end dashboard test
-
+ 
 ### Quality Gates
 
 - [ ] Run frontend production build

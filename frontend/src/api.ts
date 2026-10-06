@@ -10,7 +10,7 @@ export type AppointmentQuestion = { id: string; appointmentId: string; question:
 export type SymptomEntry = { id: string; symptom: string; severity: 'MILD' | 'MODERATE' | 'SEVERE'; occurredAt: string; notes?: string }
 export type CareTask = { id: string; taskDetailId: string; title: string; taskDate: string; completed: boolean; shared: boolean }
 export type PregnancyMilestone = { id: string; title: string; description?: string; weekNumber: number; type: 'STANDARD' | 'CUSTOM'; completed: boolean }
-export type DailyWellbeing = { date: string; waterGlasses: number; waterGoal: number; prenatalVitaminTaken: boolean; activityMinutes: number; activityGoal: number; mood?: string; sleepHours: number; sleepGoal: number; energyLevel: 'LOW' | 'STEADY' | 'HIGH'; focusTaskCount: number }
+export type DailyWellbeing = { date: string; waterGlasses: number; waterGoal: number; prenatalVitaminTaken: boolean; activityMinutes: number; activityGoal: number; mood?: string; sleepHours: number; sleepGoal: number; energyLevel: 'LOW' | 'STEADY' | 'HIGH'; focusTaskCount: number; focusTaskIds: string[] }
 export type AiAssistantReply = { answer: string; source: 'LOCAL_OLLAMA' | 'LOCAL_MODEL_UNAVAILABLE' | 'SAFETY_GUIDANCE'; urgent: boolean; safetyNote: string }
 export type WeeklyGuideData = { week: number; trimester: string; title: string; summary: string; nutrition: string[]; activity: string[]; bodyChanges: string[]; questionsForClinician: string[]; contentVersion: string; reviewedOn: string }
 export type EducationResource = { id: string; category: string; title: string; description: string; content: string; keyPoints: string[]; reviewStatus: 'EDUCATIONAL_REVIEW'; contentVersion: string; reviewedOn: string }
@@ -88,7 +88,7 @@ export const updatePrenatalVitamin = (token: string, date: string, taken: boolea
 export const updateActivity = (token: string, date: string, minutes: number) => request<DailyWellbeing>('/wellbeing/activity', { method: 'PATCH', body: JSON.stringify({ date, minutes }) }, token)
 export const updateMood = (token: string, date: string, mood: string) => request<DailyWellbeing>('/wellbeing/mood', { method: 'PATCH', body: JSON.stringify({ date, mood }) }, token)
 export const updateSleep = (token: string, date: string, hours: number) => request<DailyWellbeing>('/wellbeing/sleep', { method: 'PATCH', body: JSON.stringify({ date, hours }) }, token)
-export const updateDayPlan = (token: string, date: string, energyLevel: DailyWellbeing['energyLevel'], focusTaskCount: number) => request<DailyWellbeing>('/wellbeing/day-plan', { method: 'PATCH', body: JSON.stringify({ date, energyLevel, focusTaskCount }) }, token)
+export const updateDayPlan = (token: string, date: string, energyLevel: DailyWellbeing['energyLevel'], focusTaskCount: number, focusTaskIds: string[]) => request<DailyWellbeing>('/wellbeing/day-plan', { method: 'PATCH', body: JSON.stringify({ date, energyLevel, focusTaskCount, focusTaskIds }) }, token)
 export const askAssistant = (token: string, question: string) => request<AiAssistantReply>('/assistant', { method: 'POST', body: JSON.stringify({ question }) }, token)
 export type AdminUser = { email: string; displayName: string; role: string }
 export const getAdminUsers = (token: string) => request<AdminUser[]>('/admin/users', {}, token)

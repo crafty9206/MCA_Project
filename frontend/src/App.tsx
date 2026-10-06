@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AppointmentCard } from './components/AppointmentCard'
+import { VisitBrief } from './components/VisitBrief'
 import { AuthFlow } from './components/AuthFlow'
 import { LandingPage } from './components/LandingPage'
 import { AdminPanel } from './components/AdminPanel'
@@ -178,10 +179,10 @@ function App() {
     catch { setWellbeing(previous); setDashboardError('Your sleep record could not be saved.') }
   }
 
-  const saveDayPlan = async (energyLevel: DailyWellbeing['energyLevel'], focusTaskCount: number) => {
+  const saveDayPlan = async (energyLevel: DailyWellbeing['energyLevel'], focusTaskCount: number, focusTaskIds: string[]) => {
     const token = sessionStorage.getItem('maatricare-token')
-    if (!token || !wellbeing) return
-    try { setWellbeing(await updateDayPlan(token, wellbeing.date, energyLevel, focusTaskCount)) }
+    if (!token || !wellbeing) throw new Error('Wellbeing is unavailable')
+    try { setWellbeing(await updateDayPlan(token, wellbeing.date, energyLevel, focusTaskCount, focusTaskIds)) }
     catch {
       setDashboardError('Your gentle day plan could not be saved.')
       throw new Error('Unable to save gentle day plan')
@@ -274,7 +275,7 @@ function App() {
       case 'Appointments':
         return <div className="content feature-page" id="appointments">
           {pageHeading(translate(language, 'page.appointments.label'), translate(language, 'page.appointments.title'), translate(language, 'page.appointments.description'))}
-          <div className="feature-single-column"><AppointmentCard appointments={appointments} onCreated={addAppointment} onUpdated={updateAppointmentInList} onDeleted={deleteAppointmentFromList} language={language} /></div>
+          <div className="feature-single-column"><AppointmentCard appointments={appointments} onCreated={addAppointment} onUpdated={updateAppointmentInList} onDeleted={deleteAppointmentFromList} language={language} /><VisitBrief appointments={appointments} symptoms={symptoms} displayName={profile.displayName} /></div>
         </div>
       case 'Journal':
         return <div className="content feature-page" id="journal">

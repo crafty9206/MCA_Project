@@ -13,6 +13,8 @@ import jakarta.validation.constraints.NotNull;
 
 import jakarta.validation.constraints.Size;
 import org.springframework.security.core.Authentication;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -101,18 +103,18 @@ public class WellbeingController {
             @Valid @RequestBody DayPlanRequest request) {
         String energyLevel = request.energyLevel().trim().toUpperCase();
         if (!List.of("LOW", "STEADY", "HIGH").contains(energyLevel)) {
-            throw new IllegalArgumentException("Energy level must be LOW, STEADY, or HIGH");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Energy level must be LOW, STEADY, or HIGH");
         }
         User user = currentUser(authentication);
         if (request.focusTaskIds().size() != request.focusTaskCount()
                 || request.focusTaskIds().stream().distinct().count() != request.focusTaskIds().size()) {
-            throw new IllegalArgumentException("Choose exactly the requested number of unique focus tasks");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Choose exactly the requested number of unique focus tasks");
         }
         request.focusTaskIds().forEach(taskId -> {
             CareTask task = careTaskRepository.findByIdAndUserId(taskId, user.getId())
-                    .orElseThrow(() -> new IllegalArgumentException("Every focus task must belong to the current user"));
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid focus task"));
             if (!task.getTaskDate().equals(request.date()) || task.isCompleted()) {
-                throw new IllegalArgumentException("Focus tasks must be unfinished tasks from the selected date");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Focus tasks must be unfinished tasks from the selected date");
             }
         });
         DailyWellbeing wellbeing = wellbeingRepository.findByUserIdAndEntryDate(user.getId(), request.date())

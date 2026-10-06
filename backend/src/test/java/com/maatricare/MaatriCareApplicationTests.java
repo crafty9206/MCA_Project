@@ -275,6 +275,7 @@ class MaatriCareApplicationTests {
     @Test
     void userCanPersistAGentleDayPlanForToday() throws Exception {
         String token = registerAndGetToken("gentle-plan@example.com", "Gentle Plan User");
+        String secondToken = registerAndGetToken("gentle-plan-other@example.com", "Other Plan User");
         MvcResult tasks = mockMvc.perform(get("/api/tasks?date=2026-09-27")
             .header("Authorization", "Bearer " + token)).andExpect(status().isOk()).andReturn();
         String focusTaskId = objectMapper.readTree(tasks.getResponse().getContentAsString()).get(0).get("id").asText();
@@ -288,12 +289,28 @@ class MaatriCareApplicationTests {
             .andExpect(jsonPath("$.focusTaskCount").value(1))
             .andExpect(jsonPath("$.focusTaskIds[0]").value(focusTaskId));
 
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+            .patch("/api/wellbeing/day-plan").header("Authorization", "Bearer " + secondToken)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"date\":\"2026-09-27\",\"energyLevel\":\"LOW\",\"focusTaskCount\":1,\"focusTaskIds\":[\"" + focusTaskId + "\"]}"))
+            .andExpect(status().isBadRequest());
+
         mockMvc.perform(get("/api/wellbeing?date=2026-09-27")
             .header("Authorization", "Bearer " + token))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.energyLevel").value("LOW"))
                 .andExpect(jsonPath("$.focusTaskCount").value(1))
                 .andExpect(jsonPath("$.focusTaskIds[0]").value(focusTaskId));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+            .patch("/api/tasks/" + focusTaskId + "/complete")
+            .header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON).content("{\"completed\":true}"))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/api/wellbeing?date=2026-09-27")
+            .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.focusTaskIds[0]").value(focusTaskId));
     }
 
     @Test
