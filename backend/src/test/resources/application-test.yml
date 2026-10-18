@@ -19,3 +19,7 @@ security:
 assistant:
   ollama:
     enabled: false
+
+notifications:
+  scheduler:
+    enabled: false

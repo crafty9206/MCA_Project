@@ -1,0 +1,1 @@
+ALTER TABLE appointment_questions ADD COLUMN answer VARCHAR(2000);

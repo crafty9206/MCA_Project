@@ -36,6 +36,49 @@ class MaatriCareApplicationTests {
     }
 
     @Test
+    void emergencyContactsArePrivateValidatedAndDeletedWithAccount() throws Exception {
+        String ownerToken = registerAndGetToken("contact-owner@example.com", "Contact Owner");
+        String otherToken = registerAndGetToken("contact-other@example.com", "Contact Other");
+        String body = "{\"name\":\"Trusted friend\",\"phone\":\"+919876543210\",\"type\":\"FRIEND\"}";
+        MvcResult created = mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+            .post("/api/emergency-contacts").header("Authorization", "Bearer " + ownerToken)
+            .contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isCreated()).andReturn();
+        String id = objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asText();
+        mockMvc.perform(get("/api/emergency-contacts").header("Authorization", "Bearer " + ownerToken))
+            .andExpect(status().isOk()).andExpect(jsonPath("$[0].phone").value("+919876543210"));
+        mockMvc.perform(get("/api/emergency-contacts").header("Authorization", "Bearer " + otherToken))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+            .patch("/api/emergency-contacts/" + id).header("Authorization", "Bearer " + otherToken)
+            .contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isNotFound());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+            .delete("/api/emergency-contacts/" + id).header("Authorization", "Bearer " + otherToken))
+            .andExpect(status().isNotFound());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+            .post("/api/emergency-contacts").header("Authorization", "Bearer " + ownerToken)
+            .contentType(MediaType.APPLICATION_JSON).content(body.replace("+919876543210", "tel:bad")))
+            .andExpect(status().isBadRequest());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+            .patch("/api/emergency-contacts/" + id).header("Authorization", "Bearer " + ownerToken)
+            .contentType(MediaType.APPLICATION_JSON).content(body.replace("Trusted friend", "Updated friend")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.name").value("Updated friend"));
+        mockMvc.perform(get("/api/emergency-contacts")).andExpect(status().isUnauthorized());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+            .delete("/api/emergency-contacts/" + id).header("Authorization", "Bearer " + ownerToken))
+            .andExpect(status().isNoContent());
+        mockMvc.perform(get("/api/emergency-contacts").header("Authorization", "Bearer " + ownerToken))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+            .post("/api/emergency-contacts").header("Authorization", "Bearer " + ownerToken)
+            .contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isCreated());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+            .delete("/api/auth/account").header("Authorization", "Bearer " + ownerToken))
+            .andExpect(status().isNoContent());
+        org.junit.jupiter.api.Assertions.assertFalse(userRepository.existsByEmailIgnoreCase("contact-owner@example.com"));
+    }
+
+    @Test
     void healthEndpointReturnsRunningStatus() throws Exception {
         mockMvc.perform(get("/api/health"))
                 .andExpect(status().isOk())
@@ -270,6 +313,112 @@ class MaatriCareApplicationTests {
             .andExpect(jsonPath("$.results[2].status").value("BELOW_RANGE"))
             .andExpect(jsonPath("$.results[2].foodSources.length()").value(0))
             .andExpect(jsonPath("$.disclaimer").value(org.hamcrest.Matchers.containsString("does not diagnose")));
+    }
+
+    @Test
+    void clinicianAnswersAreSavedAndPrivate() throws Exception {
+        String token = registerAndGetToken("answers@example.com", "Answer User");
+        String other = registerAndGetToken("answers-other@example.com", "Other Answer User");
+        MvcResult visit = mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+            .post("/api/appointments").header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"Visit\",\"startsAt\":\"2026-10-20T10:00:00Z\"}"))
+            .andExpect(status().isCreated()).andReturn();
+        String visitId = objectMapper.readTree(visit.getResponse().getContentAsString()).get("id").asText();
+        MvcResult question = mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+            .post("/api/appointments/" + visitId + "/questions").header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON).content("{\"question\":\"When is my next visit?\"}"))
+            .andExpect(status().isCreated()).andReturn();
+        String id = objectMapper.readTree(question.getResponse().getContentAsString()).get("id").asText();
+        String path = "/api/appointment-questions/" + id + "/answer";
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(path)
+            .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"answer\":\"  Return in two weeks.  \"}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.answer").value("Return in two weeks."))
+            .andExpect(jsonPath("$.answered").value(true));
+        mockMvc.perform(get("/api/appointments/" + visitId + "/questions").header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk()).andExpect(jsonPath("$[0].answer").value("Return in two weeks."));
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(path)
+            .header("Authorization", "Bearer " + other).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"answer\":\"Changed\"}"))
+            .andExpect(status().isNotFound());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(path)
+            .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"answer\":\"\"}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.answered").value(false));
+    }
+
+    @Test
+    void postVisitReviewPreservesNotesAndRequiresOwnership() throws Exception {
+        String token = registerAndGetToken("post-visit@example.com", "Visit Review");
+        String other = registerAndGetToken("post-visit-other@example.com", "Other Review");
+        MvcResult created = mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+            .post("/api/appointments").header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"Follow-up\",\"startsAt\":\"2026-10-20T10:00:00Z\"}"))
+            .andExpect(status().isCreated()).andReturn();
+        String id = objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asText();
+        String path = "/api/assistant/appointments/" + id + "/post-visit-review";
+        String body = "{\"notes\":\"Repeat blood test\\nReturn in two weeks\",\"useAi\":true}";
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(path)
+            .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.points[0]").value("Repeat blood test"))
+            .andExpect(jsonPath("$.points[1]").value("Return in two weeks"))
+            .andExpect(jsonPath("$.source").value("LOCAL_MODEL_UNAVAILABLE"));
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(path)
+            .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"notes\":\"Take medicine 5 mg\",\"useAi\":true}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.medicationReviewRequired").value(true))
+            .andExpect(jsonPath("$.source").value("ORIGINAL_NOTES"));
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(path)
+            .header("Authorization", "Bearer " + other).contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/appointments/" + id + "/questions").header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void appointmentQuestionSuggestionsUseOnlyOwnedAppointments() throws Exception {
+        String ownerToken = registerAndGetToken("visit-questions@example.com", "Visit Questions");
+        String otherToken = registerAndGetToken("other-visit@example.com", "Other Visit");
+        MvcResult appointment = mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+            .post("/api/appointments").header("Authorization", "Bearer " + ownerToken)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"Prenatal checkup\",\"startsAt\":\"2026-10-20T10:00:00+05:30\"}"))
+            .andExpect(status().isCreated()).andReturn();
+        String appointmentId = objectMapper.readTree(appointment.getResponse().getContentAsString()).get("id").asText();
+
+        MvcResult suggestions = mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+            .post("/api/assistant/appointments/" + appointmentId + "/question-suggestions")
+            .header("Authorization", "Bearer " + ownerToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.source").value("GUIDED_SUPPORT"))
+            .andExpect(jsonPath("$.questions.length()").value(5)).andReturn();
+
+        String draft = objectMapper.readTree(suggestions.getResponse().getContentAsString())
+                .get("questions").get(0).asText();
+        for (String question : java.util.List.of(draft, "What should I bring to my next visit?")) {
+            mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                .post("/api/appointments/" + appointmentId + "/questions")
+                .header("Authorization", "Bearer " + ownerToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(java.util.Map.of("question", question))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.question").value(question));
+        }
+        MvcResult saved = mockMvc.perform(get("/api/appointments/" + appointmentId + "/questions")
+            .header("Authorization", "Bearer " + ownerToken))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(2)).andReturn();
+        java.util.List<String> savedTexts = new java.util.ArrayList<>();
+        objectMapper.readTree(saved.getResponse().getContentAsString())
+                .forEach(question -> savedTexts.add(question.get("question").asText()));
+        org.junit.jupiter.api.Assertions.assertTrue(savedTexts.contains(draft));
+        org.junit.jupiter.api.Assertions.assertTrue(savedTexts.contains("What should I bring to my next visit?"));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+            .post("/api/assistant/appointments/" + appointmentId + "/question-suggestions")
+            .header("Authorization", "Bearer " + otherToken))
+            .andExpect(status().isNotFound());
     }
 
     @Test

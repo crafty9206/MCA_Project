@@ -1,15 +1,18 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { updatePregnancyProfile, updateProfile } from '../api'
+import { BellRing } from 'lucide-react'
+import { deletePushSubscriptions, getPushSettings, savePushSubscription, updatePregnancyProfile, updateProfile } from '../api'
 import type { DashboardProfile } from '../api'
+import type { PushSettings } from '../api'
 
 type ProfileSettingsProps = {
   profile: DashboardProfile
   onClose: () => void
   onSaved: (profile: DashboardProfile) => void
+  onPushStatusChange: (enabled: boolean) => void
 }
 
-export function ProfileSettings({ profile, onClose, onSaved }: ProfileSettingsProps) {
+export function ProfileSettings({ profile, onClose, onSaved, onPushStatusChange }: ProfileSettingsProps) {
   const pregnancy = profile.pregnancy
   const [displayName, setDisplayName] = useState(profile.displayName)
   const [lastMenstrualPeriod, setLastMenstrualPeriod] = useState(pregnancy?.lastMenstrualPeriod ?? '')
@@ -30,6 +33,63 @@ export function ProfileSettings({ profile, onClose, onSaved }: ProfileSettingsPr
   const [missedTaskRemindersEnabled, setMissedTaskRemindersEnabled] = useState(profile.missedTaskRemindersEnabled)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [pushSettings, setPushSettings] = useState<PushSettings | null>(null)
+  const [pushBusy, setPushBusy] = useState(false)
+  const [pushError, setPushError] = useState('')
+
+  useEffect(() => {
+    const token = sessionStorage.getItem('maatricare-token')
+    if (token) getPushSettings(token).then(setPushSettings).catch(() => setPushError('Push settings could not be loaded.'))
+  }, [])
+
+  const enablePush = async () => {
+    const token = sessionStorage.getItem('maatricare-token')
+    if (!token || !pushSettings?.available || !('serviceWorker' in navigator) || !('PushManager' in window)) return
+    setPushBusy(true)
+    setPushError('')
+    try {
+      const permission = await Notification.requestPermission()
+      if (permission !== 'granted') throw new Error('Allow notifications in your browser to enable push reminders.')
+      const registration = await navigator.serviceWorker.register('/service-worker.js')
+      let subscription = await registration.pushManager.getSubscription()
+      if (!subscription) {
+        const key = pushSettings.publicKey.replace(/-/g, '+').replace(/_/g, '/')
+        const decoded = atob(key + '='.repeat((4 - key.length % 4) % 4))
+        const applicationServerKey = new Uint8Array(decoded.length)
+        for (let index = 0; index < decoded.length; index += 1) applicationServerKey[index] = decoded.charCodeAt(index)
+        subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey })
+      }
+      const saved = subscription.toJSON()
+      if (!saved.endpoint || !saved.keys?.p256dh || !saved.keys.auth) throw new Error('The browser returned an incomplete push subscription.')
+      const settings = await savePushSubscription(token, { endpoint: saved.endpoint, keys: { p256dh: saved.keys.p256dh, auth: saved.keys.auth } })
+      setPushSettings(settings)
+      onPushStatusChange(settings.enabled)
+    } catch (cause) {
+      setPushError(cause instanceof Error ? cause.message : 'Push reminders could not be enabled.')
+    } finally {
+      setPushBusy(false)
+    }
+  }
+
+  const disablePush = async () => {
+    const token = sessionStorage.getItem('maatricare-token')
+    if (!token) return
+    setPushBusy(true)
+    setPushError('')
+    try {
+      const registration = await navigator.serviceWorker.getRegistration()
+      const subscription = await registration?.pushManager.getSubscription()
+      await deletePushSubscriptions(token)
+      await subscription?.unsubscribe()
+      const settings = await getPushSettings(token)
+      setPushSettings(settings)
+      onPushStatusChange(settings.enabled)
+    } catch {
+      setPushError('Push reminders could not be turned off. Please try again.')
+    } finally {
+      setPushBusy(false)
+    }
+  }
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
@@ -39,7 +99,7 @@ export function ProfileSettings({ profile, onClose, onSaved }: ProfileSettingsPr
     setError('')
     try {
       const reminderDay = Math.min(7, Math.max(1, Number(weeklyPregnancyReminderDay) || 1))
-      let updated = await updateProfile(token, { displayName, appointmentRemindersEnabled, browserNotificationsEnabled, dailyCareRemindersEnabled, dailyCareReminderTime, weeklyPregnancyRemindersEnabled, weeklyPregnancyReminderDay: reminderDay, weeklyPregnancyReminderTime, missedTaskRemindersEnabled })
+      let updated = await updateProfile(token, { displayName, appointmentRemindersEnabled, browserNotificationsEnabled, dailyCareRemindersEnabled, dailyCareReminderTime, weeklyPregnancyRemindersEnabled, weeklyPregnancyReminderDay: reminderDay, weeklyPregnancyReminderTime, missedTaskRemindersEnabled, timezoneId: profile.timezoneId || 'Asia/Kolkata' })
       if (pregnancy) {
         updated = await updatePregnancyProfile(token, {
           lastMenstrualPeriod,
@@ -70,6 +130,7 @@ export function ProfileSettings({ profile, onClose, onSaved }: ProfileSettingsPr
           {error && <p className="form-error" role="alert">{error}</p>}
           <div className="settings-actions"><button className="outline-button" type="button" disabled={saving} onClick={onClose}>Cancel</button><button className="primary-button" type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save changes'}</button></div>
         </form>
+        <div className="push-settings"><div className="settings-divider"><span>Push delivery</span></div><div className="push-settings-heading"><BellRing aria-hidden="true" /><div><strong>{pushSettings?.enabled ? 'Push reminders are on' : 'Push reminders are off'}</strong><small>{pushSettings?.enabled ? `${pushSettings.subscriptionCount} browser${pushSettings.subscriptionCount === 1 ? '' : 's'} subscribed` : 'Receive reminders even when MaatriCare is closed.'}</small></div></div><label>Reminder timezone<input disabled value="Asia/Kolkata · Delhi, India" /></label>{pushSettings?.available ? <button className={pushSettings.enabled ? 'outline-button' : 'primary-button'} type="button" disabled={pushBusy} onClick={() => void (pushSettings.enabled ? disablePush() : enablePush())}>{pushBusy ? 'Updating push…' : pushSettings.enabled ? 'Turn off push reminders' : 'Enable push reminders'}</button> : <p className="panel-description">Push delivery is not configured on this server yet.</p>}{pushError && <p className="form-error" role="alert">{pushError}</p>}</div>
       </section>
     </div>
   )

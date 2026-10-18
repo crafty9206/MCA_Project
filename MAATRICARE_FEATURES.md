@@ -66,6 +66,8 @@ Legend:
 - [x] Add provider and clinic contact details
 - [x] Add appointment preparation questions
 - [x] Add appointment reminder settings
+- [x] Export appointments to calendar files
+- [x] Export appointments to calendar files
 
 ## Priority 2: Tracking and Wellbeing
 
@@ -170,6 +172,11 @@ Legend:
 - [x] Add weekly pregnancy reminders
 - [x] Add missed-task reminders
 - [x] Add browser notifications
+- [x] Add one-hour reminder snooze
+- [x] Add scheduled Web Push delivery with server-side deduplication and retries
+- [x] Add push subscription management and device opt-in/out
+- [x] Add one-time, expiring notification snooze actions
+- [x] Schedule reminders in the account timezone (default Asia/Kolkata)
 - [ ] Add email notifications
 - [ ] Add SMS notifications only after provider and privacy review
 
@@ -213,20 +220,20 @@ Legend:
 AI features require a separate safety and privacy decision before implementation.
 
 - [ ] Choose a local model or external provider
-- [ ] Define approved AI use cases
-- [ ] Define request and response formats
+- [x] Define approved AI use cases
+- [x] Define request and response formats
 - [ ] Create weekly summary endpoint
-- [ ] Create appointment-question preparation endpoint
+- [x] Create appointment-question preparation endpoint
 - [ ] Use only user-approved data
 - [ ] Minimize health data sent externally
-- [ ] Add AI-generated content labeling
-- [ ] Include medical disclaimers in AI responses
-- [ ] Prevent diagnosis and treatment recommendations
-- [ ] Prevent emergency-care advice from replacing emergency services
+- [x] Add AI-generated content labeling
+- [x] Include medical disclaimers in AI responses
+- [x] Prevent diagnosis and treatment recommendations
+- [x] Prevent emergency-care advice from replacing emergency services
 - [ ] Add rate limits
 - [ ] Add usage limits
 - [ ] Add unsafe-output testing
-- [ ] Add provider outage fallback
+- [x] Add provider outage fallback
 - [ ] Add prompt and response audit strategy without storing unnecessary health data
 
 ## Priority 7: Testing and Quality

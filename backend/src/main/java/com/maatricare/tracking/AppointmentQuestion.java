@@ -34,6 +34,9 @@ public class AppointmentQuestion {
     @Column(nullable = false)
     private boolean answered;
 
+    @Column(length = 2000)
+    private String answer;
+
     protected AppointmentQuestion() {
     }
 
@@ -46,6 +49,11 @@ public class AppointmentQuestion {
     public UUID getAppointmentId() { return appointment.getId(); }
     public String getQuestion() { return question; }
     public boolean isAnswered() { return answered; }
+    public String getAnswer() { return answer; }
+    public void recordAnswer(String answer) {
+        this.answer = answer.trim().isEmpty() ? null : answer.trim();
+        this.answered = this.answer != null;
+    }
 
     public void update(String question, boolean answered) {
         this.question = question;

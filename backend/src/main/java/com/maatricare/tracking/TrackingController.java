@@ -113,6 +113,16 @@ public class TrackingController {
         return questionResponse(appointmentQuestionRepository.save(question));
         }
 
+    @PatchMapping("/appointment-questions/{id}/answer")
+    public QuestionResponse recordAnswer(Authentication authentication, @PathVariable UUID id,
+            @Valid @RequestBody AnswerRequest request) {
+        AppointmentQuestion question = appointmentQuestionRepository
+                .findByIdAndAppointment_User_Id(id, currentUser(authentication).getId())
+                .orElseThrow(() -> new java.util.NoSuchElementException("Appointment question not found"));
+        question.recordAnswer(request.answer());
+        return questionResponse(appointmentQuestionRepository.save(question));
+    }
+
         @DeleteMapping("/appointment-questions/{id}")
         @ResponseStatus(HttpStatus.NO_CONTENT)
         public void deleteQuestion(Authentication authentication, @PathVariable UUID id) {
@@ -269,7 +279,7 @@ public class TrackingController {
 
     private QuestionResponse questionResponse(AppointmentQuestion question) {
         return new QuestionResponse(question.getId(), question.getAppointmentId(), question.getQuestion(),
-                question.isAnswered());
+                question.isAnswered(), question.getAnswer());
     }
 
     public record AppointmentRequest(@NotBlank @Size(max = 160) String title, @NotNull OffsetDateTime startsAt,
@@ -279,7 +289,8 @@ public class TrackingController {
             String providerName, String clinicName, String notes, Integer reminderMinutesBefore) {}
     public record QuestionRequest(@NotBlank @Size(max = 500) String question) {}
     public record QuestionUpdateRequest(@NotBlank @Size(max = 500) String question, boolean answered) {}
-    public record QuestionResponse(UUID id, UUID appointmentId, String question, boolean answered) {}
+    public record AnswerRequest(@NotNull @Size(max = 2000) String answer) {}
+    public record QuestionResponse(UUID id, UUID appointmentId, String question, boolean answered, String answer) {}
         public record SymptomRequest(@NotBlank @Size(max = 80) String symptom,
             @NotBlank String severity, @NotNull OffsetDateTime occurredAt, @Size(max = 1000) String notes) {}
         public record SymptomResponse(UUID id, String symptom, String severity, OffsetDateTime occurredAt, String notes) {}

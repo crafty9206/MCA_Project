@@ -2,6 +2,7 @@ package com.maatricare.profile;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.math.BigDecimal;
 
@@ -54,7 +55,10 @@ public class ProfileController {
     @GetMapping
     public ProfileResponse getProfile(Authentication authentication) {
         User user = currentUser(authentication);
-        ensureDefaultTasks(user, LocalDate.now());
+        ZoneId zone;
+        try { zone = ZoneId.of(user.getTimezoneId()); }
+        catch (RuntimeException exception) { zone = ZoneId.of("Asia/Kolkata"); }
+        ensureDefaultTasks(user, LocalDate.now(zone));
         return toResponse(user, pregnancyProfileRepository.findByUserId(user.getId()).orElse(null));
     }
 
@@ -62,6 +66,14 @@ public class ProfileController {
     public ProfileResponse updateProfile(Authentication authentication, @Valid @RequestBody ProfileUpdateRequest request) {
         User user = currentUser(authentication);
         user.setDisplayName(request.displayName().trim());
+        if (request.timezoneId() != null) {
+            try {
+                user.setTimezoneId(request.timezoneId());
+            } catch (java.time.DateTimeException exception) {
+                throw new org.springframework.web.server.ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Unsupported timezone");
+            }
+        }
         user.updateNotificationPreferences(
             request.appointmentRemindersEnabled() == null ? user.isAppointmentRemindersEnabled() : request.appointmentRemindersEnabled(),
             request.browserNotificationsEnabled() == null ? user.isBrowserNotificationsEnabled() : request.browserNotificationsEnabled(),
@@ -145,7 +157,8 @@ public class ProfileController {
             user.isAppointmentRemindersEnabled(), user.isBrowserNotificationsEnabled(),
                 user.isDailyCareRemindersEnabled(), user.getDailyCareReminderTime(),
                 user.isWeeklyPregnancyRemindersEnabled(), user.getWeeklyPregnancyReminderDay(),
-                user.getWeeklyPregnancyReminderTime(), user.isMissedTaskRemindersEnabled(), pregnancy);
+                user.getWeeklyPregnancyReminderTime(), user.isMissedTaskRemindersEnabled(), user.getTimezoneId(),
+                user.isPushNotificationsEnabled(), pregnancy);
     }
 
     private PregnancySummary pregnancySummary(PregnancyProfile profile) {
@@ -169,7 +182,8 @@ public class ProfileController {
                 Boolean appointmentRemindersEnabled, Boolean browserNotificationsEnabled,
                 Boolean dailyCareRemindersEnabled, LocalTime dailyCareReminderTime,
                 Boolean weeklyPregnancyRemindersEnabled, @Min(1) @Max(7) Integer weeklyPregnancyReminderDay,
-                LocalTime weeklyPregnancyReminderTime, Boolean missedTaskRemindersEnabled) {
+                LocalTime weeklyPregnancyReminderTime, Boolean missedTaskRemindersEnabled,
+                @Size(max = 64) String timezoneId) {
     }
 
         public record ProfileResponse(String email, String displayName, String preferredLanguage,
@@ -177,6 +191,7 @@ public class ProfileController {
                 boolean dailyCareRemindersEnabled, LocalTime dailyCareReminderTime,
                 boolean weeklyPregnancyRemindersEnabled, int weeklyPregnancyReminderDay,
                 LocalTime weeklyPregnancyReminderTime, boolean missedTaskRemindersEnabled,
+                String timezoneId, boolean pushNotificationsEnabled,
                 PregnancySummary pregnancy) {
     }
 

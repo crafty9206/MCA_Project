@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AppointmentCard } from './components/AppointmentCard'
+import { PostVisitCheck } from './components/PostVisitCheck'
 import { VisitBrief } from './components/VisitBrief'
 import { AuthFlow } from './components/AuthFlow'
 import { LandingPage } from './components/LandingPage'
@@ -35,6 +36,7 @@ function App() {
   const sharedReportToken = new URLSearchParams(window.location.search).get('share')
   const [profile, setProfile] = useState<DashboardProfile | null>(null)
   const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null)
   const [tasks, setTasks] = useState<CareTask[]>([])
   const [taskHistory, setTaskHistory] = useState<CareTask[]>([])
   const [symptoms, setSymptoms] = useState<SymptomEntry[]>([])
@@ -50,6 +52,7 @@ function App() {
   const [loading, setLoading] = useState(true)
   const language: LanguageCode = 'en'
   const [activeNav, setActiveNav] = useState('Overview')
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [authScreen, setAuthScreen] = useState<'landing' | 'signup' | 'signin'>(() => {
     const savedScreen = sessionStorage.getItem('maatricare-auth-screen')
     return savedScreen === 'signup' || savedScreen === 'signin' ? savedScreen : 'landing'
@@ -190,17 +193,24 @@ function App() {
   }
 
   const loadTrackingData = async (token: string) => {
-    const todayDate = new Date()
-    const historyStartDate = new Date(todayDate)
-    const historyEndDate = new Date(todayDate)
-    historyStartDate.setDate(historyStartDate.getDate() - 7)
-    historyEndDate.setDate(historyEndDate.getDate() - 1)
-    const localDate = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+    const dateInReminderTimezone = (date: Date) => {
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit',
+      }).formatToParts(date)
+      const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? ''
+      return `${part('year')}-${part('month')}-${part('day')}`
+    }
+    const shiftReminderDate = (date: string, days: number) => {
+      const shifted = new Date(`${date}T00:00:00Z`)
+      shifted.setUTCDate(shifted.getUTCDate() + days)
+      return shifted.toISOString().slice(0, 10)
+    }
+    const todayDate = dateInReminderTimezone(new Date())
     const [loadedAppointments, loadedTasks, loadedHistory, loadedWellbeing, loadedSymptoms, loadedMilestones] = await Promise.all([
       getAppointments(token),
-      getTasks(token, localDate(todayDate)),
-      getTaskHistory(token, localDate(historyStartDate), localDate(historyEndDate)),
-      getWellbeing(token, localDate(todayDate)),
+      getTasks(token, todayDate),
+      getTaskHistory(token, shiftReminderDate(todayDate, -7), shiftReminderDate(todayDate, -1)),
+      getWellbeing(token, todayDate),
       getSymptoms(token),
       getMilestones(token),
     ])
@@ -275,7 +285,7 @@ function App() {
       case 'Appointments':
         return <div className="content feature-page" id="appointments">
           {pageHeading(translate(language, 'page.appointments.label'), translate(language, 'page.appointments.title'), translate(language, 'page.appointments.description'))}
-          <div className="feature-single-column"><AppointmentCard appointments={appointments} onCreated={addAppointment} onUpdated={updateAppointmentInList} onDeleted={deleteAppointmentFromList} language={language} /><VisitBrief appointments={appointments} symptoms={symptoms} displayName={profile.displayName} /></div>
+          <div className="feature-single-column"><AppointmentCard appointments={appointments} selectedAppointmentId={selectedAppointmentId} onSelectedAppointmentChange={setSelectedAppointmentId} onCreated={addAppointment} onUpdated={updateAppointmentInList} onDeleted={deleteAppointmentFromList} language={language} /><VisitBrief appointments={appointments} selectedAppointmentId={selectedAppointmentId} onSelectedAppointmentChange={setSelectedAppointmentId} symptoms={symptoms} displayName={profile.displayName} /><PostVisitCheck appointments={appointments} selectedAppointmentId={selectedAppointmentId} onSelectedAppointmentChange={setSelectedAppointmentId} /></div>
         </div>
       case 'Journal':
         return <div className="content feature-page" id="journal">
@@ -323,13 +333,13 @@ function App() {
   })()
 
   return (
-    <main className="app-shell">
-      <Topbar activeNav={activeNav} onNavigate={setActiveNav} onLogout={handleLogout} onDeleteAccount={() => setShowDeleteConfirmation(true)} onOpenSettings={() => setShowProfileSettings(true)} displayName={profile.displayName} appointments={appointments} appointmentRemindersEnabled={profile.appointmentRemindersEnabled} browserNotificationsEnabled={profile.browserNotificationsEnabled} tasks={tasks} dailyCareRemindersEnabled={profile.dailyCareRemindersEnabled} dailyCareReminderTime={profile.dailyCareReminderTime} pregnancy={profile.pregnancy} weeklyPregnancyRemindersEnabled={profile.weeklyPregnancyRemindersEnabled} weeklyPregnancyReminderDay={profile.weeklyPregnancyReminderDay} weeklyPregnancyReminderTime={profile.weeklyPregnancyReminderTime} taskHistory={taskHistory} missedTaskRemindersEnabled={profile.missedTaskRemindersEnabled} />
+    <main className={`app-shell sidebar-layout${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
+      <Topbar sidebarCollapsed={sidebarCollapsed} onToggleSidebar={() => setSidebarCollapsed((collapsed) => !collapsed)} activeNav={activeNav} onNavigate={setActiveNav} onLogout={handleLogout} onDeleteAccount={() => setShowDeleteConfirmation(true)} onOpenSettings={() => setShowProfileSettings(true)} displayName={profile.displayName} appointments={appointments} appointmentRemindersEnabled={profile.appointmentRemindersEnabled} browserNotificationsEnabled={profile.browserNotificationsEnabled} pushNotificationsEnabled={profile.pushNotificationsEnabled} tasks={tasks} dailyCareRemindersEnabled={profile.dailyCareRemindersEnabled} dailyCareReminderTime={profile.dailyCareReminderTime} pregnancy={profile.pregnancy} weeklyPregnancyRemindersEnabled={profile.weeklyPregnancyRemindersEnabled} weeklyPregnancyReminderDay={profile.weeklyPregnancyReminderDay} weeklyPregnancyReminderTime={profile.weeklyPregnancyReminderTime} taskHistory={taskHistory} missedTaskRemindersEnabled={profile.missedTaskRemindersEnabled} />
       {activePage}
       {dashboardError && <p className="dashboard-error" role="alert">{dashboardError}</p>}
       <p className="disclaimer">{translate(language, 'disclaimer')}</p>
       {showDeleteConfirmation && <div className="confirm-overlay" role="presentation"><section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-account-title"><p className="section-label">Permanent action</p><h2 id="delete-account-title">Delete your account?</h2><p>This permanently removes your pregnancy profile, appointments, care-task history, and account information. This cannot be undone.</p><div className="confirm-actions"><button className="outline-button" type="button" disabled={deletingAccount} onClick={() => setShowDeleteConfirmation(false)}>Cancel</button><button className="danger-button" type="button" disabled={deletingAccount} onClick={handleDeleteAccount}>{deletingAccount ? 'Deleting…' : 'Delete account'}</button></div></section></div>}
-      {showProfileSettings && <ProfileSettings profile={profile} onClose={() => setShowProfileSettings(false)} onSaved={(updatedProfile) => { setProfile(updatedProfile); setShowProfileSettings(false) }} />}
+      {showProfileSettings && <ProfileSettings profile={profile} onClose={() => setShowProfileSettings(false)} onSaved={(updatedProfile) => { setProfile(updatedProfile); setShowProfileSettings(false) }} onPushStatusChange={(enabled) => setProfile((current) => current ? { ...current, pushNotificationsEnabled: enabled } : current)} />}
     </main>
   )
 }

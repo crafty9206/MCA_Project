@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { CalendarRange, RotateCcw } from 'lucide-react'
+import { CalendarRange, RotateCcw, Search } from 'lucide-react'
 import { createSymptom, deleteSymptom, updateSymptom } from '../api'
 import type { SymptomEntry } from '../api'
 import { localeFor } from '../i18n'
@@ -28,6 +28,8 @@ export function JournalCard({ selected, onSelect, entries, onCreated, onUpdated,
   const [dateFilter, setDateFilter] = useState<DateFilter>('ALL')
   const [filterFrom, setFilterFrom] = useState('')
   const [filterTo, setFilterTo] = useState('')
+  const [entrySearch, setEntrySearch] = useState('')
+  const [severityFilter, setSeverityFilter] = useState<'ALL' | SymptomEntry['severity']>('ALL')
 
   const today = new Date()
   const presetStart = new Date(today)
@@ -40,13 +42,30 @@ export function JournalCard({ selected, onSelect, entries, onCreated, onUpdated,
     const entryDate = localDateKey(entry.occurredAt)
     if (activeFrom && entryDate < activeFrom) return false
     if (activeTo && entryDate > activeTo) return false
+    if (severityFilter !== 'ALL' && entry.severity !== severityFilter) return false
+    const search = entrySearch.trim().toLocaleLowerCase()
+    if (search && !`${entry.symptom} ${entry.notes ?? ''}`.toLocaleLowerCase().includes(search)) return false
     return true
   })
 
-  const resetDateFilter = () => {
+  const symptomCounts = filteredEntries.reduce<Record<string, number>>((counts, entry) => {
+    const label = entry.symptom.trim() || 'Unspecified'
+    counts[label] = (counts[label] ?? 0) + 1
+    return counts
+  }, {})
+  const symptomPatterns = Object.entries(symptomCounts)
+    .sort(([firstName, firstCount], [secondName, secondCount]) => secondCount - firstCount || firstName.localeCompare(secondName))
+  const severityCounts = filteredEntries.reduce<Record<SymptomEntry['severity'], number>>((counts, entry) => {
+    counts[entry.severity] += 1
+    return counts
+  }, { MILD: 0, MODERATE: 0, SEVERE: 0 })
+
+  const resetFilters = () => {
     setDateFilter('ALL')
     setFilterFrom('')
     setFilterTo('')
+    setEntrySearch('')
+    setSeverityFilter('ALL')
   }
 
   const submit = async (event: FormEvent) => {
@@ -72,7 +91,8 @@ export function JournalCard({ selected, onSelect, entries, onCreated, onUpdated,
       <button className="text-button" type="button" onClick={() => setShowForm((open) => !open)}>{translate(language, showForm ? 'journal.close' : 'journal.open')} <span>{showForm ? '↑' : '→'}</span></button>
       {showForm && <form className="journal-form" onSubmit={submit}><label>Symptom or note<input required maxLength={80} value={symptom} onChange={(event) => setSymptom(event.target.value)} placeholder="Headache, tiredness, or a note" /></label><div className="form-row"><label>Severity<select value={severity} onChange={(event) => setSeverity(event.target.value as SymptomEntry['severity'])}><option value="MILD">Mild</option><option value="MODERATE">Moderate</option><option value="SEVERE">Severe</option></select></label><label>When<input required type="datetime-local" value={occurredAt} onChange={(event) => setOccurredAt(event.target.value)} /></label></div><label>Notes <span className="optional">Optional</span><textarea maxLength={1000} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="What would you like to remember?" /></label>{error && <p className="form-error">{error}</p>}<button className="primary-button" type="submit">{editingEntry ? 'Update entry' : 'Save entry'} <span>→</span></button></form>}
       <section className="journal-filter" aria-labelledby="journal-filter-title">
-        <div className="journal-filter-heading"><span className="journal-filter-icon" aria-hidden="true"><CalendarRange /></span><div><strong id="journal-filter-title">Filter journal history</strong><small>Choose a quick period or set your own dates.</small></div>{dateFilter !== 'ALL' && <button type="button" aria-label="Reset date filter" title="Reset date filter" onClick={resetDateFilter}><RotateCcw /></button>}</div>
+        <div className="journal-filter-heading"><span className="journal-filter-icon" aria-hidden="true"><CalendarRange /></span><div><strong id="journal-filter-title">Filter journal history</strong><small>Search entries, choose a severity, and set a date range.</small></div>{(dateFilter !== 'ALL' || entrySearch || severityFilter !== 'ALL') && <button type="button" aria-label="Reset journal filters" title="Reset journal filters" onClick={resetFilters}><RotateCcw /></button>}</div>
+        <div className="journal-filter-query"><label className="journal-search"><Search aria-hidden="true" /><span className="sr-only">Search symptoms and notes</span><input type="search" value={entrySearch} onChange={(event) => setEntrySearch(event.target.value)} placeholder="Search symptoms and notes" /></label><label className="journal-severity-filter">Severity<select value={severityFilter} onChange={(event) => setSeverityFilter(event.target.value as typeof severityFilter)}><option value="ALL">All severities</option><option value="MILD">Mild</option><option value="MODERATE">Moderate</option><option value="SEVERE">Severe</option></select></label></div>
         <div className="journal-filter-presets" aria-label="Journal date range">
           {([['ALL', 'All entries'], ['7_DAYS', 'Last 7 days'], ['30_DAYS', 'Last 30 days'], ['CUSTOM', 'Custom range']] as const).map(([value, label]) => <button key={value} type="button" className={dateFilter === value ? 'active' : ''} aria-pressed={dateFilter === value} onClick={() => setDateFilter(value)}>{label}</button>)}
         </div>
@@ -80,8 +100,20 @@ export function JournalCard({ selected, onSelect, entries, onCreated, onUpdated,
         {invalidRange && <p className="form-error" role="alert">Start date must be before the end date.</p>}
         <p className="journal-filter-result">Showing <strong>{filteredEntries.length}</strong> of {entries.length} entries{activeFrom || activeTo ? ` · ${activeFrom || 'earliest'} to ${activeTo || 'today'}` : ''}</p>
       </section>
+      <section className="journal-patterns" aria-labelledby="journal-patterns-title">
+        <div className="journal-patterns-heading"><div><p className="section-label">Personal tracking</p><h3 id="journal-patterns-title">Patterns in matching entries</h3></div><span>{filteredEntries.length} {filteredEntries.length === 1 ? 'entry' : 'entries'}</span></div>
+        {filteredEntries.length === 0 ? <p className="journal-patterns-empty">No entries match these filters. Try changing your search, severity, or date range.</p> : <>
+          <div className="journal-severity-summary" aria-label="Entries by recorded severity">
+            {(['MILD', 'MODERATE', 'SEVERE'] as const).map((level) => <div key={level}><span>{level.charAt(0) + level.slice(1).toLowerCase()}</span><strong>{severityCounts[level]}</strong></div>)}
+          </div>
+          <div className="journal-symptom-pattern-list" aria-label="Entries grouped by symptom">
+            {symptomPatterns.map(([name, count]) => <div className="journal-symptom-pattern" key={name}><span>{name}</span><div><i style={{ width: `${Math.max(10, (count / filteredEntries.length) * 100)}%` }} /></div><strong>{count}</strong></div>)}
+          </div>
+        </>}
+        <small>Based only on entries you recorded. This summary does not identify causes or diagnose conditions.</small>
+      </section>
       {filteredEntries.length > 0 && <div className="journal-history">{filteredEntries.map((entry) => <article key={entry.id}><div><strong>{entry.symptom}</strong><span>{entry.severity.toLowerCase()} · {new Date(entry.occurredAt).toLocaleDateString(localeFor(language), { day: 'numeric', month: 'short' })}</span></div><div className="journal-actions"><button type="button" aria-label="Edit journal entry" onClick={() => { setEditingEntry(entry); setSymptom(entry.symptom); setSeverity(entry.severity); setOccurredAt(new Date(entry.occurredAt).toISOString().slice(0, 16)); setNotes(entry.notes ?? ''); setShowForm(true) }}>Edit</button><button type="button" aria-label="Delete journal entry" onClick={() => setDeletingEntry(entry)}>×</button></div></article>)}</div>}
-      {!invalidRange && filteredEntries.length === 0 && entries.length > 0 && <p className="journal-filter-empty">No entries were recorded in this period. Try another range.</p>}
+      {!invalidRange && filteredEntries.length === 0 && entries.length > 0 && <p className="journal-filter-empty">No entries match these filters. Try adjusting your search or filters.</p>}
       {deletingEntry && <div className="confirm-overlay"><section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-symptom-title"><p className="section-label">Journal entry</p><h2 id="delete-symptom-title">Delete this entry?</h2><p>This removes the symptom note from your private journal history.</p><div className="confirm-actions"><button className="outline-button" type="button" onClick={() => setDeletingEntry(null)}>Cancel</button><button className="danger-button" type="button" onClick={async () => { const token = sessionStorage.getItem('maatricare-token'); if (!token) return; await deleteSymptom(token, deletingEntry.id); onDeleted(deletingEntry.id); setDeletingEntry(null) }}>Delete</button></div></section></div>}
     </section>
   )

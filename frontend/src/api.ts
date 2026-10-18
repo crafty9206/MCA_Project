@@ -1,12 +1,20 @@
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8080/api'
 
+export type EmergencyContact = { id: string; name: string; phone: string; type: 'HOSPITAL' | 'DOCTOR' | 'PARTNER' | 'FAMILY' | 'FRIEND' | 'OTHER' }
+export type EmergencyContactInput = Omit<EmergencyContact, 'id'>
+
 export type PregnancySummary = { lastMenstrualPeriod: string; dueDate: string; currentWeek: number; trimester: string; weeksRemaining: number; ageYears: number; heightCm?: number; prePregnancyWeightKg?: number; bloodPressure?: string; bloodGroup?: string }
-export type DashboardProfile = { email: string; displayName: string; preferredLanguage: string; appointmentRemindersEnabled: boolean; browserNotificationsEnabled: boolean; dailyCareRemindersEnabled: boolean; dailyCareReminderTime: string; weeklyPregnancyRemindersEnabled: boolean; weeklyPregnancyReminderDay: number; weeklyPregnancyReminderTime: string; missedTaskRemindersEnabled: boolean; pregnancy: PregnancySummary | null }
+export type DashboardProfile = { email: string; displayName: string; preferredLanguage: string; appointmentRemindersEnabled: boolean; browserNotificationsEnabled: boolean; dailyCareRemindersEnabled: boolean; dailyCareReminderTime: string; weeklyPregnancyRemindersEnabled: boolean; weeklyPregnancyReminderDay: number; weeklyPregnancyReminderTime: string; missedTaskRemindersEnabled: boolean; timezoneId: string; pushNotificationsEnabled: boolean; pregnancy: PregnancySummary | null }
+export type PushSettings = { available: boolean; publicKey: string; enabled: boolean; subscriptionCount: number; timezoneId: string }
 export type AuthResponse = { token: string; email: string; displayName: string; role: 'USER' | 'ADMIN' }
 export type SignupPayload = { displayName: string; email: string; password: string }
 export type PregnancyPayload = { lastMenstrualPeriod: string; ageYears: number; heightCm?: number; prePregnancyWeightKg?: number; bloodPressure?: string; bloodGroup?: string }
 export type Appointment = { id: string; title: string; startsAt: string; endsAt?: string; providerName?: string; clinicName?: string; notes?: string; reminderMinutesBefore?: number }
-export type AppointmentQuestion = { id: string; appointmentId: string; question: string; answered: boolean }
+export type AppointmentQuestion = { id: string; appointmentId: string; question: string; answered: boolean; answer?: string | null }
+export const recordQuestionAnswer = (token: string, id: string, answer: string) => request<AppointmentQuestion>(`/appointment-questions/${id}/answer`, { method: 'PATCH', body: JSON.stringify({ answer }) }, token)
+export type AppointmentQuestionSuggestions = { questions: string[]; source: 'LOCAL_OLLAMA' | 'GUIDED_SUPPORT' }
+export type PostVisitReview = { points: string[]; recap: string; source: 'ORIGINAL_NOTES' | 'LOCAL_OLLAMA' | 'LOCAL_MODEL_UNAVAILABLE'; medicationReviewRequired: boolean; safetyNote: string }
+export const reviewVisit = (token: string, appointmentId: string, notes: string, useAi: boolean) => request<PostVisitReview>(`/assistant/appointments/${appointmentId}/post-visit-review`, { method: 'POST', body: JSON.stringify({ notes, useAi }) }, token)
 export type SymptomEntry = { id: string; symptom: string; severity: 'MILD' | 'MODERATE' | 'SEVERE'; occurredAt: string; notes?: string }
 export type CareTask = { id: string; taskDetailId: string; title: string; taskDate: string; completed: boolean; shared: boolean }
 export type PregnancyMilestone = { id: string; title: string; description?: string; weekNumber: number; type: 'STANDARD' | 'CUSTOM'; completed: boolean }
@@ -45,7 +53,14 @@ export const resetPassword = (token: string, password: string) => request<void>(
 export const logout = (token: string) => request<void>('/auth/logout', { method: 'POST' }, token)
 export const deleteAccount = (token: string) => request<void>('/auth/account', { method: 'DELETE' }, token)
 export const getProfile = (token: string) => request<DashboardProfile>('/profile', {}, token)
-export const updateProfile = (token: string, payload: { displayName: string; appointmentRemindersEnabled: boolean; browserNotificationsEnabled: boolean; dailyCareRemindersEnabled: boolean; dailyCareReminderTime: string; weeklyPregnancyRemindersEnabled: boolean; weeklyPregnancyReminderDay: number; weeklyPregnancyReminderTime: string; missedTaskRemindersEnabled: boolean }) => request<DashboardProfile>('/profile', { method: 'PATCH', body: JSON.stringify(payload) }, token)
+export const getEmergencyContacts = (token: string) => request<EmergencyContact[]>('/emergency-contacts', {}, token)
+export const saveEmergencyContact = (token: string, payload: EmergencyContactInput, id?: string) => request<EmergencyContact>(`/emergency-contacts${id ? `/${id}` : ''}`, { method: id ? 'PATCH' : 'POST', body: JSON.stringify(payload) }, token)
+export const deleteEmergencyContact = (token: string, id: string) => request<void>(`/emergency-contacts/${id}`, { method: 'DELETE' }, token)
+export const updateProfile = (token: string, payload: { displayName: string; appointmentRemindersEnabled: boolean; browserNotificationsEnabled: boolean; dailyCareRemindersEnabled: boolean; dailyCareReminderTime: string; weeklyPregnancyRemindersEnabled: boolean; weeklyPregnancyReminderDay: number; weeklyPregnancyReminderTime: string; missedTaskRemindersEnabled: boolean; timezoneId: string }) => request<DashboardProfile>('/profile', { method: 'PATCH', body: JSON.stringify(payload) }, token)
+export const getPushSettings = (token: string) => request<PushSettings>('/push/settings', {}, token)
+export const savePushSubscription = (token: string, subscription: { endpoint: string; keys: { p256dh: string; auth: string } }) => request<PushSettings>('/push/subscriptions', { method: 'POST', body: JSON.stringify(subscription) }, token)
+export const deletePushSubscriptions = (token: string) => request<void>('/push/subscriptions', { method: 'DELETE' }, token)
+export const snoozePushReminder = (token: string, deduplicationKey: string) => request<void>('/push/snooze', { method: 'POST', body: JSON.stringify({ deduplicationKey }) }, token)
 export const createPregnancyProfile = (token: string, payload: PregnancyPayload) => request<DashboardProfile>('/profile/pregnancy', { method: 'POST', body: JSON.stringify(payload) }, token)
 export const updatePregnancyProfile = (token: string, payload: PregnancyPayload) => request<DashboardProfile>('/profile/pregnancy', { method: 'PATCH', body: JSON.stringify(payload) }, token)
 export const getAppointments = (token: string) => request<Appointment[]>('/appointments', {}, token)
@@ -53,6 +68,7 @@ export const createAppointment = (token: string, payload: { title: string; start
 export const updateAppointment = (token: string, id: string, payload: { title: string; startsAt: string; endsAt?: string; providerName?: string; clinicName?: string; notes?: string; reminderMinutesBefore?: number }) => request<Appointment>(`/appointments/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }, token)
 export const deleteAppointment = (token: string, id: string) => request<void>(`/appointments/${id}`, { method: 'DELETE' }, token)
 export const getAppointmentQuestions = (token: string, appointmentId: string) => request<AppointmentQuestion[]>(`/appointments/${appointmentId}/questions`, {}, token)
+export const suggestAppointmentQuestions = (token: string, appointmentId: string) => request<AppointmentQuestionSuggestions>(`/assistant/appointments/${appointmentId}/question-suggestions`, { method: 'POST' }, token)
 export const createAppointmentQuestion = (token: string, appointmentId: string, question: string) => request<AppointmentQuestion>(`/appointments/${appointmentId}/questions`, { method: 'POST', body: JSON.stringify({ question }) }, token)
 export const updateAppointmentQuestion = (token: string, id: string, question: string, answered: boolean) => request<AppointmentQuestion>(`/appointment-questions/${id}`, { method: 'PATCH', body: JSON.stringify({ question, answered }) }, token)
 export const deleteAppointmentQuestion = (token: string, id: string) => request<void>(`/appointment-questions/${id}`, { method: 'DELETE' }, token)

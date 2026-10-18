@@ -10,6 +10,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.ColumnDefault;
 
 @Entity
 @Table(name = "users")
@@ -57,6 +58,14 @@ public class User {
 
     @Column(name = "missed_task_reminders_enabled", nullable = false)
     private boolean missedTaskRemindersEnabled;
+
+    @Column(name = "timezone_id", nullable = false, length = 64)
+    @ColumnDefault("'Asia/Kolkata'")
+    private String timezoneId = "Asia/Kolkata";
+
+    @Column(name = "push_notifications_enabled", nullable = false)
+    @ColumnDefault("false")
+    private boolean pushNotificationsEnabled;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -118,6 +127,17 @@ public class User {
     }
     public LocalTime getWeeklyPregnancyReminderTime() { return weeklyPregnancyReminderTime; }
     public boolean isMissedTaskRemindersEnabled() { return missedTaskRemindersEnabled; }
+    public String getTimezoneId() { return timezoneId; }
+    public boolean isPushNotificationsEnabled() { return pushNotificationsEnabled; }
+
+    public void setTimezoneId(String timezoneId) {
+        java.time.ZoneId.of(timezoneId);
+        this.timezoneId = timezoneId;
+    }
+
+    public void setPushNotificationsEnabled(boolean enabled) {
+        this.pushNotificationsEnabled = enabled;
+    }
 
     public void updateNotificationPreferences(boolean appointmentRemindersEnabled,
             boolean browserNotificationsEnabled, boolean dailyCareRemindersEnabled,

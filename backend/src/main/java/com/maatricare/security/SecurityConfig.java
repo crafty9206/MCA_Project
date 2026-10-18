@@ -37,6 +37,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                     .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login",
                         "/api/auth/forgot-password", "/api/auth/reset-password").permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/push/snooze-action").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/shared-reports/**").permitAll()
                     .requestMatchers("/api/health", "/actuator/health", "/error").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")

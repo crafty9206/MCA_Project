@@ -41,3 +41,13 @@ assistant:
     enabled: ${OLLAMA_ENABLED:true}
     url: ${OLLAMA_URL:http://localhost:11434}
     model: ${OLLAMA_MODEL:gemma3:1b}
+
+notifications:
+  scheduler:
+    enabled: ${NOTIFICATION_SCHEDULER_ENABLED:true}
+    interval-ms: ${NOTIFICATION_SCHEDULER_INTERVAL_MS:30000}
+  web-push:
+    vapid-public-key: ${VAPID_PUBLIC_KEY:}
+    vapid-private-key: ${VAPID_PRIVATE_KEY:}
+    subject: ${VAPID_SUBJECT:mailto:support@maatricare.local}
+    api-base-url: ${NOTIFICATION_API_BASE_URL:http://localhost:8080/api}
