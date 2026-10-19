@@ -15,4 +15,6 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     List<User> findAllByOrderByEmailAsc();
 
     List<User> findByRoleOrderByEmailAsc(String role);
+
+    List<User> findByPushNotificationsEnabledTrue();
 }

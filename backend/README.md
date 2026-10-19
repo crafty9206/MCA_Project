@@ -20,7 +20,7 @@ The health endpoint is available at `http://localhost:8080/api/health`.
 
 ## Scheduled Push Reminders
 
-Push delivery is opt-in per account and uses the existing appointment, daily-care, missed-task, and weekly-pregnancy reminder preferences. Reminder times use `Asia/Kolkata` by default. The backend reconciles schedules every 30 seconds, retries transient delivery failures, and keeps reminder text generic on device lock screens.
+Push delivery is opt-in per account and uses the existing appointment, daily-care, missed-task, and weekly-pregnancy reminder preferences. Reminder times use `Asia/Kolkata` by default. The backend reconciles schedules every 30 seconds, retries transient delivery failures, and keeps reminder text generic on device lock screens. Sent, failed, and cancelled reminder records are pruned after 90 days.
 
 Generate a VAPID key pair with `npx --yes web-push generate-vapid-keys`, then provide the values through environment variables; do not commit the private key:
 

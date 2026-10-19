@@ -28,4 +28,6 @@ public interface PushReminderRepository extends JpaRepository<PushReminder, UUID
     @Query("update PushReminder reminder set reminder.status = 'PENDING', reminder.claimedAt = null "
             + "where reminder.status = 'SENDING' and reminder.claimedAt < :leaseExpiry")
     int releaseExpiredClaims(@Param("leaseExpiry") Instant leaseExpiry);
+
+        long deleteByStatusInAndDeliveredAtBefore(List<String> statuses, Instant expiry);
 }

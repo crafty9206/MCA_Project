@@ -1,6 +1,7 @@
 package com.maatricare;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -124,6 +125,23 @@ class PushReminderTests {
         assertTrue(snoozed.getSnoozedUntil().isAfter(Instant.now().plusSeconds(59 * 60)));
         mockMvc.perform(post("/api/push/snooze-action").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void terminalReminderRecordsOlderThanNinetyDaysArePruned() throws Exception {
+        User user = userRepository.saveAndFlush(new User("retention-" + UUID.randomUUID() + "@example.com",
+                "hash", "Retention User"));
+        Instant deliveredAt = Instant.now().minus(java.time.Duration.ofDays(91));
+        PushReminder expired = new PushReminder(user, "care:2026-01-01:09:00", "CARE",
+                "Daily care reminder", "Open MaatriCare to review your care tasks.", deliveredAt);
+        expired.markClaimed(deliveredAt, sha256("expired-capability"), deliveredAt.plusSeconds(60));
+        expired.markDelivered(deliveredAt);
+        expired = reminderRepository.saveAndFlush(expired);
+        UUID expiredId = expired.getId();
+
+        schedulingService.synchronizeAndFindDue();
+
+        assertFalse(reminderRepository.existsById(expiredId));
     }
 
     private String registerAndGetToken(String email, String displayName) throws Exception {

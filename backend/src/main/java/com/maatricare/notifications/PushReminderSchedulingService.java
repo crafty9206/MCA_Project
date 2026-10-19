@@ -51,7 +51,9 @@ public class PushReminderSchedulingService {
     public List<UUID> synchronizeAndFindDue() {
         Instant now = Instant.now();
         reminderRepository.releaseExpiredClaims(now.minusSeconds(300));
-        for (User user : userRepository.findAll()) synchronizeUser(user, now);
+        reminderRepository.deleteByStatusInAndDeliveredAtBefore(List.of("SENT", "FAILED", "CANCELLED"),
+            now.minus(java.time.Duration.ofDays(90)));
+        for (User user : userRepository.findByPushNotificationsEnabledTrue()) synchronizeUser(user, now);
         return reminderRepository.findTop50ByStatusAndScheduledAtLessThanEqualOrderByScheduledAtAsc("PENDING", now)
                 .stream().map(PushReminder::getId).toList();
     }
